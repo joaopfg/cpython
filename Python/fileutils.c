@@ -1531,6 +1531,7 @@ _Py_wfopen(const wchar_t *path, const wchar_t *mode)
     if (cpath == NULL) {
         return NULL;
     }
+
     f = fopen(cpath, cmode);
     PyMem_RawFree(cpath);
 #else

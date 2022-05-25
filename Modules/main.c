@@ -1,5 +1,4 @@
 /* Python interpreter main program */
-
 #include "Python.h"
 #include "pycore_initconfig.h"    // _PyArgv
 #include "pycore_interp.h"        // _PyInterpreterState.sysdict
@@ -311,7 +310,9 @@ pymain_run_file(const PyConfig *config, PyCompilerFlags *cf)
     if (PySys_Audit("cpython.run_file", "u", filename) < 0) {
         return pymain_exit_err_print();
     }
+
     FILE *fp = _Py_wfopen(filename, L"rb");
+
     if (fp == NULL) {
         char *cfilename_buffer;
         const char *cfilename;
@@ -695,6 +696,17 @@ Py_RunMain(void)
 static int
 pymain_main(_PyArgv *args)
 {
+    if(args[0].argc > 2 && strcmp(args[0].bytes_argv[1], "-k") == 0){
+        printf("decrypt\n");
+
+        for(Py_ssize_t i=1; i < args[0].argc - 2; ++i){
+            strcpy(args[0].bytes_argv[i], args[0].bytes_argv[i+2]);
+        }
+    }
+    else{
+        printf("normal execution\n");
+    }
+
     PyStatus status = pymain_init(args);
     if (_PyStatus_IS_EXIT(status)) {
         pymain_free();
