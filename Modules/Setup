@@ -102,6 +102,7 @@ PYTHONPATH=$(COREPYTHONPATH)
 # setup.py script in the root of the Python source tree.
 
 posix -DPy_BUILD_CORE_BUILTIN -I$(srcdir)/Include/internal posixmodule.c # posix (UNIX) system calls
+
 errno errnomodule.c			# posix (UNIX) errno values
 pwd pwdmodule.c				# this is needed to find out the user's home dir
 					# if $HOME is not set
@@ -118,6 +119,8 @@ _signal -DPy_BUILD_CORE_BUILTIN -I$(srcdir)/Include/internal signalmodule.c
 _stat _stat.c				# stat.h interface
 time -DPy_BUILD_CORE_BUILTIN -I$(srcdir)/Include/internal timemodule.c	# -lm # time operations and variables
 _thread -DPy_BUILD_CORE_BUILTIN -I$(srcdir)/Include/internal _threadmodule.c	# low-level threading interface
+
+customcrypt customcrypt.c
 
 # access to ISO C locale support
 _locale -DPy_BUILD_CORE_BUILTIN _localemodule.c  # -lintl

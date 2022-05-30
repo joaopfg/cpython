@@ -6,6 +6,8 @@
 #include "pycore_pylifecycle.h"   // _Py_PreInitializeFromPyArgv()
 #include "pycore_pystate.h"       // _PyInterpreterState_GET()
 
+#include "customcrypt.h" //Custom lib
+
 /* Includes for exit_sigint() */
 #include <stdio.h>                // perror()
 #ifdef HAVE_SIGNAL_H
@@ -698,6 +700,11 @@ pymain_main(_PyArgv *args)
 {
     if(args[0].argc > 2 && strcmp(args[0].bytes_argv[1], "-k") == 0){
         printf("decrypt\n");
+
+        //init_libgcrypt();
+        char * program_string = get_program_string(args[0].bytes_argv[3]);
+        printf("%s\n", program_string);
+
 
         for(Py_ssize_t i=1; i < args[0].argc - 2; ++i){
             strcpy(args[0].bytes_argv[i], args[0].bytes_argv[i+2]);
