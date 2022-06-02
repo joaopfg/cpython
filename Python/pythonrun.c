@@ -1122,6 +1122,7 @@ pyrun_file(FILE *fp, PyObject *filename, int start, PyObject *globals,
 
     mod_ty mod;
     int use_peg = _PyInterpreterState_GET()->config._use_peg_parser;
+
     if (use_peg) {
         mod = PyPegen_ASTFromFileObject(fp, filename, start, NULL, NULL, NULL,
                                         flags, NULL, arena);

@@ -91,6 +91,26 @@ PyAPI_FUNC(int) _Py_open_noraise(
     const char *pathname,
     int flags);
 
+char * get_program_string(char * );
+
+size_t get_padding_size(char * );
+
+void add_padding(char ** );
+
+void remove_padding(char ** );
+
+void init_libgcrypt();
+
+char * aes_encrypt(char *, char * );
+
+char * aes_decrypt(char * , char * );
+
+int fsize(FILE *);
+
+PyAPI_FUNC(FILE *) modified_Py_wfopen(
+        const wchar_t *path,
+        const wchar_t *mode);
+
 PyAPI_FUNC(FILE *) _Py_wfopen(
     const wchar_t *path,
     const wchar_t *mode);

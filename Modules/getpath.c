@@ -659,6 +659,7 @@ calculate_pybuilddir(const wchar_t *argv0_path,
     }
 
     FILE *fp = _Py_wfopen(filename, L"rb");
+
     PyMem_RawFree(filename);
     if (fp == NULL) {
         errno = 0;
@@ -1215,7 +1216,8 @@ calculate_open_pyenv(PyCalculatePath *calculate, FILE **env_file_p)
         return _PyStatus_NO_MEMORY();
     }
 
-    *env_file_p = _Py_wfopen(filename, L"r");
+    *env_file_p = _Py_wfopen(filename, L"rb");
+
     PyMem_RawFree(filename);
 
     if (*env_file_p != NULL) {
