@@ -609,12 +609,15 @@ pymain_run_python(int *exitcode)
         *exitcode = pymain_run_command(config->run_command, &cf);
     }
     else if (config->run_module) {
+        printf("run module\n");
         *exitcode = pymain_run_module(config->run_module, 1);
     }
     else if (main_importer_path != NULL) {
+        printf("run importer path\n");
         *exitcode = pymain_run_module(L"__main__", 0);
     }
     else if (config->run_filename != NULL) {
+        printf("run file\n");
         *exitcode = pymain_run_file(config, &cf);
     }
     else {
@@ -714,26 +717,6 @@ Py_RunMain(void)
 static int
 pymain_main(_PyArgv *args)
 {
-    /*
-    if(args[0].argc > 2 && strcmp(args[0].bytes_argv[1], "-k") == 0){
-        printf("decrypt\n");
-
-        char * program_string = get_program_string(args[0].bytes_argv[3]);
-
-        init_libgcrypt();
-        char * encrypted_txt = aes_encrypt(program_string, "G-KaPdSgVkYp3s6v9y$B&E)H@MbQeThWmZq4t7w!z%C*F-JaNdRfUjXn2r5u8x/A");
-        char * decrypted_txt = aes_decrypt(encrypted_txt, "G-KaPdSgVkYp3s6v9y$B&E)H@MbQeThWmZq4t7w!z%C*F-JaNdRfUjXn2r5u8x/A");
-        printf("decrypted text:\n %s\n", decrypted_txt);
-
-
-        for(Py_ssize_t i=1; i < args[0].argc - 2; ++i){
-            strcpy(args[0].bytes_argv[i], args[0].bytes_argv[i+2]);
-        }
-    }
-    else{
-        printf("normal execution\n");
-    } */
-
     PyStatus status = pymain_init(args);
     if (_PyStatus_IS_EXIT(status)) {
         pymain_free();

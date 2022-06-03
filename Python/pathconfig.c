@@ -613,6 +613,8 @@ _PyPathConfig_ComputeSysPath0(const PyWideStringList *argv, PyObject **path0_p)
     }
 
     wchar_t *argv0 = argv->items[0];
+    wprintf(L"argv0: %ls\n", argv0);
+
     int have_module_arg = (wcscmp(argv0, L"-m") == 0);
     int have_script_arg = (!have_module_arg && (wcscmp(argv0, L"-c") != 0));
 
@@ -620,6 +622,7 @@ _PyPathConfig_ComputeSysPath0(const PyWideStringList *argv, PyObject **path0_p)
     Py_ssize_t n = 0;
 
 #ifdef HAVE_REALPATH
+    wprintf(L"entry1\n");
     wchar_t fullpath[MAXPATHLEN];
 #elif defined(MS_WINDOWS)
     wchar_t fullpath[MAX_PATH];
@@ -643,6 +646,7 @@ _PyPathConfig_ComputeSysPath0(const PyWideStringList *argv, PyObject **path0_p)
     wchar_t path0copy[2 * MAXPATHLEN + 1];
 
     if (have_script_arg) {
+        wprintf(L"entry2\n");
         nr = _Py_wreadlink(path0, link, Py_ARRAY_LENGTH(link));
     }
     if (nr > 0) {
@@ -703,6 +707,7 @@ _PyPathConfig_ComputeSysPath0(const PyWideStringList *argv, PyObject **path0_p)
 #else
     /* All other filename syntaxes */
     if (have_script_arg) {
+        wprintf(L"entry3\n");
 #if defined(HAVE_REALPATH)
         if (_Py_wrealpath(path0, fullpath, Py_ARRAY_LENGTH(fullpath))) {
             path0 = fullpath;
@@ -713,6 +718,7 @@ _PyPathConfig_ComputeSysPath0(const PyWideStringList *argv, PyObject **path0_p)
     if (p != NULL) {
         n = p + 1 - path0;
 #if SEP == '/' /* Special case for Unix filename syntax */
+        wprintf(L"entry4\n");
         if (n > 1) {
             /* Drop trailing separator */
             n--;
@@ -720,7 +726,7 @@ _PyPathConfig_ComputeSysPath0(const PyWideStringList *argv, PyObject **path0_p)
 #endif /* Unix */
     }
 #endif /* All others */
-
+    wprintf(L"entry5\n");
     PyObject *path0_obj = PyUnicode_FromWideChar(path0, n);
     if (path0_obj == NULL) {
         return -1;

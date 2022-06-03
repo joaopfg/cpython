@@ -1737,10 +1737,15 @@ char * aes_decrypt(char * encrypted_txt, char * sym_key){
 }
 
 int fsize(FILE *fp){
+    //printf("entry1\n");
     int prev=ftell(fp);
+    //printf("entry2\n");
     fseek(fp, 0L, SEEK_END);
+    //printf("entry3\n");
     int sz=ftell(fp);
+    //printf("entry4\n");
     fseek(fp,prev,SEEK_SET); //go back to where we were
+    //printf("entry5\n");
     return sz;
 }
 
@@ -1753,11 +1758,15 @@ int fsize(FILE *fp){
 FILE *
 modified_Py_wfopen(const wchar_t *path, const wchar_t *mode)
 {
-    //printf("modified_Py_wfopen\n");
+    printf("modified_Py_wfopen\n");
+
     FILE *f;
+
     if (PySys_Audit("open", "uui", path, mode, 0) < 0) {
+        printf("failed in PySys_Audit\n");
         return NULL;
     }
+
 #ifndef MS_WINDOWS
     char *cpath;
     char cmode[10];
@@ -1765,19 +1774,34 @@ modified_Py_wfopen(const wchar_t *path, const wchar_t *mode)
     r = wcstombs(cmode, mode, 10);
     if (r == DECODE_ERROR || r >= 10) {
         errno = EINVAL;
+        printf("failed with DECODE_ERROR\n");
         return NULL;
     }
     cpath = _Py_EncodeLocaleRaw(path, NULL);
     if (cpath == NULL) {
+        printf("failed because cpath was NULL\n");
         return NULL;
     }
 
     f = fopen(cpath, cmode);
 
+    printf("managed to open the file\n");
+
     long size = fsize(f);
+
+    printf("size of file %lu\n", size);
+
     char * encrypted_buffer = malloc(size);
     fread(encrypted_buffer, 1, size, f);
+
+    printf("managed to read the encrypted buffer\n");
+
     char * decrypted_buffer = aes_decrypt(encrypted_buffer, "G-KaPdSgVkYp3s6v9y$B&E)H@MbQeThWmZq4t7w!z%C*F-JaNdRfUjXn2r5u8x/A");
+
+    printf("managed to decrypt the buffer content\n");
+
+    printf("%s\n", decrypted_buffer);
+
     f = fmemopen(decrypted_buffer, strlen(decrypted_buffer) + 1, cmode);
 
     PyMem_RawFree(cpath);
