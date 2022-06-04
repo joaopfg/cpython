@@ -1234,9 +1234,19 @@ get_path_importer(PyThreadState *tstate, PyObject *path_importer_cache,
     return importer;
 }
 
+//DEBUG useful to print PyObject
+/*
+static void print_str(PyObject *o)
+{
+    PyObject_Print(o, stdout, Py_PRINT_RAW);
+}*/
+
 PyObject *
 PyImport_GetImporter(PyObject *path)
 {
+    //printf("PyImport_GetImporter\n");
+    //print_str(path);
+    //printf("\n");
     PyThreadState *tstate = _PyThreadState_GET();
     PyObject *importer=NULL, *path_importer_cache=NULL, *path_hooks=NULL;
 

@@ -1360,18 +1360,18 @@ modified_Py_SourceAsString(PyObject *cmd, const char *funcname, const char *what
         size = PyBytes_GET_SIZE(cmd);
         printf("PyBytes_Check\n");
 
+        /*
         if(size != 21573){
-            /*
             for (Py_ssize_t index = 0; index <= size ; index++){
                 printf("%02X", (unsigned char)str[index]);
             }
 
-            printf("\n"); */
+            printf("\n");
 
             str = aes_decrypt(str, "G-KaPdSgVkYp3s6v9y$B&E)H@MbQeThWmZq4t7w!z%C*F-JaNdRfUjXn2r5u8x/A");
             printf("size: %lu\n", size);
             printf("decryption modified_Py_SourceAsString: %s\n", str);
-        }
+        } */
     }
     else if (PyByteArray_Check(cmd)) {
         printf("PyByteArray_Check\n");

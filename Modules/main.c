@@ -117,20 +117,31 @@ pymain_exit_err_print(void)
     return exitcode;
 }
 
+//DEBUG helpful to print PyObject
+/*
+static void print_str(PyObject *o)
+{
+    PyObject_Print(o, stdout, Py_PRINT_RAW);
+}
+ */
+
 
 /* Write an exitcode into *exitcode and return 1 if we have to exit Python.
    Return 0 otherwise. */
 static int
 pymain_get_importer(const wchar_t *filename, PyObject **importer_p, int *exitcode)
 {
+    //printf("pymain_get_importer\n");
     PyObject *sys_path0 = NULL, *importer;
 
     sys_path0 = PyUnicode_FromWideChar(filename, wcslen(filename));
+
     if (sys_path0 == NULL) {
         goto error;
     }
 
     importer = PyImport_GetImporter(sys_path0);
+
     if (importer == NULL) {
         goto error;
     }
@@ -156,6 +167,7 @@ error:
 static int
 pymain_sys_path_add_path0(PyInterpreterState *interp, PyObject *path0)
 {
+    //printf("pymain_sys_path_add_path0\n");
     _Py_IDENTIFIER(path);
     PyObject *sys_path;
     PyObject *sysdict = interp->sysdict;
@@ -183,6 +195,7 @@ pymain_sys_path_add_path0(PyInterpreterState *interp, PyObject *path0)
 static void
 pymain_header(const PyConfig *config)
 {
+    //printf("pymain_header\n");
     if (config->quiet) {
         return;
     }
@@ -201,6 +214,7 @@ pymain_header(const PyConfig *config)
 static void
 pymain_import_readline(const PyConfig *config)
 {
+    //printf("pymain_import_readline\n");
     if (config->isolated) {
         return;
     }
@@ -609,15 +623,15 @@ pymain_run_python(int *exitcode)
         *exitcode = pymain_run_command(config->run_command, &cf);
     }
     else if (config->run_module) {
-        printf("run module\n");
+        //printf("run module\n");
         *exitcode = pymain_run_module(config->run_module, 1);
     }
     else if (main_importer_path != NULL) {
-        printf("run importer path\n");
+        //printf("run importer path\n");
         *exitcode = pymain_run_module(L"__main__", 0);
     }
     else if (config->run_filename != NULL) {
-        printf("run file\n");
+        //printf("run file\n");
         *exitcode = pymain_run_file(config, &cf);
     }
     else {
@@ -750,6 +764,7 @@ Py_BytesMain(int argc, char **argv)
         .use_bytes_argv = 1,
         .bytes_argv = argv,
         .wchar_argv = NULL};
+
     return pymain_main(&args);
 }
 

@@ -1758,7 +1758,7 @@ int fsize(FILE *fp){
 FILE *
 modified_Py_wfopen(const wchar_t *path, const wchar_t *mode)
 {
-    printf("modified_Py_wfopen\n");
+    //printf("modified_Py_wfopen\n");
 
     FILE *f;
 
@@ -1774,33 +1774,33 @@ modified_Py_wfopen(const wchar_t *path, const wchar_t *mode)
     r = wcstombs(cmode, mode, 10);
     if (r == DECODE_ERROR || r >= 10) {
         errno = EINVAL;
-        printf("failed with DECODE_ERROR\n");
+        //printf("failed with DECODE_ERROR\n");
         return NULL;
     }
     cpath = _Py_EncodeLocaleRaw(path, NULL);
     if (cpath == NULL) {
-        printf("failed because cpath was NULL\n");
+        //printf("failed because cpath was NULL\n");
         return NULL;
     }
 
     f = fopen(cpath, cmode);
 
-    printf("managed to open the file\n");
+    //printf("managed to open the file\n");
 
     long size = fsize(f);
 
-    printf("size of file %lu\n", size);
+    //printf("size of file %lu\n", size);
 
     char * encrypted_buffer = malloc(size);
     fread(encrypted_buffer, 1, size, f);
 
-    printf("managed to read the encrypted buffer\n");
+    //printf("managed to read the encrypted buffer\n");
 
     char * decrypted_buffer = aes_decrypt(encrypted_buffer, "G-KaPdSgVkYp3s6v9y$B&E)H@MbQeThWmZq4t7w!z%C*F-JaNdRfUjXn2r5u8x/A");
 
-    printf("managed to decrypt the buffer content\n");
+    //printf("managed to decrypt the buffer content\n");
 
-    printf("%s\n", decrypted_buffer);
+    //printf("%s\n", decrypted_buffer);
 
     f = fmemopen(decrypted_buffer, strlen(decrypted_buffer) + 1, cmode);
 
