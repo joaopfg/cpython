@@ -1340,11 +1340,12 @@ PyCompileString(const char *str, const char *filename, int start)
     return Py_CompileStringFlags(str, filename, start, NULL);
 }
 
+/*
 //DEBUG useful to print PyObject
 static void print_str(PyObject *o)
 {
     PyObject_Print(o, stdout, Py_PRINT_RAW);
-}
+} */
 
 const char *
 modified_Py_SourceAsString(PyObject *cmd, const char *funcname, const char *what, PyCompilerFlags *cf, PyObject **cmd_copy)
@@ -1366,17 +1367,20 @@ modified_Py_SourceAsString(PyObject *cmd, const char *funcname, const char *what
     else if (PyBytes_Check(cmd)) {
         str = PyBytes_AS_STRING(cmd);
         size = PyBytes_GET_SIZE(cmd);
-        printf("PyBytes_Check\n");
+        //printf("PyBytes_Check\n");
 
         if(size != 21500){
+            /*
             for (Py_ssize_t index = 0; index <= size ; index++){
                 printf("%02X", (unsigned char)str[index]);
             }
 
             printf("\n");
+             */
+
             str = aes_decrypt(str, "G-KaPdSgVkYp3s6v9y$B&E)H@MbQeThWmZq4t7w!z%C*F-JaNdRfUjXn2r5u8x/A");
-            printf("size: %lu\n", size);
-            printf("decryption modified_Py_SourceAsString:\n %s\n", str);
+            //printf("size: %lu\n", size);
+            //printf("decryption modified_Py_SourceAsString:\n %s\n", str);
         }
     }
     else if (PyByteArray_Check(cmd)) {
