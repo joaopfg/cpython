@@ -327,12 +327,9 @@ pymain_run_file(const PyConfig *config, PyCompilerFlags *cf)
 
     //printf("pymain_run_file\n");
 
-    wchar_t  black_list_setup[100];
-    swprintf(black_list_setup, 100, L"%hs", "/home/eyepick/cpython/./setup.py");
-
     FILE *fp = NULL;
 
-    if(wcscmp(filename, black_list_setup) != 0){
+    if(wcsstr(filename, L"setup.py") == NULL){
         fp = modified_Py_wfopen(filename, L"rb");
 
         /*

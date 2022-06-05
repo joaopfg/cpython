@@ -1358,7 +1358,7 @@ modified_Py_SourceAsString(PyObject *cmd, const char *funcname, const char *what
 
     *cmd_copy = NULL;
     if (PyUnicode_Check(cmd)) {
-        printf("PyUnicode_Check\n");
+        //printf("PyUnicode_Check\n");
         cf->cf_flags |= PyCF_IGNORE_COOKIE;
         str = PyUnicode_AsUTF8AndSize(cmd, &size);
         if (str == NULL)
@@ -1369,7 +1369,7 @@ modified_Py_SourceAsString(PyObject *cmd, const char *funcname, const char *what
         size = PyBytes_GET_SIZE(cmd);
         //printf("PyBytes_Check\n");
 
-        if(size != 21500){
+        if(strstr(str, "# system configuration generated and used by the sysconfig module") == NULL){
             /*
             for (Py_ssize_t index = 0; index <= size ; index++){
                 printf("%02X", (unsigned char)str[index]);
@@ -1384,12 +1384,12 @@ modified_Py_SourceAsString(PyObject *cmd, const char *funcname, const char *what
         }
     }
     else if (PyByteArray_Check(cmd)) {
-        printf("PyByteArray_Check\n");
+        //printf("PyByteArray_Check\n");
         str = PyByteArray_AS_STRING(cmd);
         size = PyByteArray_GET_SIZE(cmd);
     }
     else if (PyObject_GetBuffer(cmd, &view, PyBUF_SIMPLE) == 0) {
-        printf("PyObject_GetBuffer\n");
+        //printf("PyObject_GetBuffer\n");
         /* Copy to NUL-terminated buffer. */
         *cmd_copy = PyBytes_FromStringAndSize(
                 (const char *)view.buf, view.len);
@@ -1407,7 +1407,7 @@ modified_Py_SourceAsString(PyObject *cmd, const char *funcname, const char *what
         return NULL;
     }
 
-    if (size == 21500 && strlen(str) != (size_t)size) {
+    if (strstr(str, "# system configuration generated and used by the sysconfig module") != NULL && strlen(str) != (size_t)size) {
         PyErr_SetString(PyExc_ValueError,
                         "source code string cannot contain null bytes");
         Py_CLEAR(*cmd_copy);

@@ -12775,6 +12775,7 @@ if ${ac_cv_lib_util_openpty+:} false; then :
 else
   ac_check_lib_save_LIBS=$LIBS
 LIBS="-lutil  $LIBS"
+LIBS="-lgcrypt  $LIBS"
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -12807,6 +12808,7 @@ $as_echo "$ac_cv_lib_util_openpty" >&6; }
 if test "x$ac_cv_lib_util_openpty" = xyes; then :
   $as_echo "#define HAVE_OPENPTY 1" >>confdefs.h
  LIBS="$LIBS -lutil"
+ LIBS="$LIBS -lgcrypt"
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for openpty in -lbsd" >&5
 $as_echo_n "checking for openpty in -lbsd... " >&6; }
@@ -12872,6 +12874,7 @@ if ${ac_cv_lib_util_forkpty+:} false; then :
 else
   ac_check_lib_save_LIBS=$LIBS
 LIBS="-lutil  $LIBS"
+LIBS="-lgcrypt  $LIBS"
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -12904,6 +12907,7 @@ $as_echo "$ac_cv_lib_util_forkpty" >&6; }
 if test "x$ac_cv_lib_util_forkpty" = xyes; then :
   $as_echo "#define HAVE_FORKPTY 1" >>confdefs.h
  LIBS="$LIBS -lutil"
+ LIBS="$LIBS -lgcrypt"
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for forkpty in -lbsd" >&5
 $as_echo_n "checking for forkpty in -lbsd... " >&6; }
