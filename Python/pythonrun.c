@@ -1340,9 +1340,17 @@ PyCompileString(const char *str, const char *filename, int start)
     return Py_CompileStringFlags(str, filename, start, NULL);
 }
 
+//DEBUG useful to print PyObject
+static void print_str(PyObject *o)
+{
+    PyObject_Print(o, stdout, Py_PRINT_RAW);
+}
+
 const char *
 modified_Py_SourceAsString(PyObject *cmd, const char *funcname, const char *what, PyCompilerFlags *cf, PyObject **cmd_copy)
 {
+    //print_str(cmd);
+    //printf("\n");
     const char *str;
     Py_ssize_t size;
     Py_buffer view;
@@ -1360,18 +1368,16 @@ modified_Py_SourceAsString(PyObject *cmd, const char *funcname, const char *what
         size = PyBytes_GET_SIZE(cmd);
         printf("PyBytes_Check\n");
 
-        /*
-        if(size != 21573){
+        if(size != 21500){
             for (Py_ssize_t index = 0; index <= size ; index++){
                 printf("%02X", (unsigned char)str[index]);
             }
 
             printf("\n");
-
             str = aes_decrypt(str, "G-KaPdSgVkYp3s6v9y$B&E)H@MbQeThWmZq4t7w!z%C*F-JaNdRfUjXn2r5u8x/A");
             printf("size: %lu\n", size);
-            printf("decryption modified_Py_SourceAsString: %s\n", str);
-        } */
+            printf("decryption modified_Py_SourceAsString:\n %s\n", str);
+        }
     }
     else if (PyByteArray_Check(cmd)) {
         printf("PyByteArray_Check\n");
@@ -1397,7 +1403,7 @@ modified_Py_SourceAsString(PyObject *cmd, const char *funcname, const char *what
         return NULL;
     }
 
-    if (size == 21573 && strlen(str) != (size_t)size) {
+    if (size == 21500 && strlen(str) != (size_t)size) {
         PyErr_SetString(PyExc_ValueError,
                         "source code string cannot contain null bytes");
         Py_CLEAR(*cmd_copy);

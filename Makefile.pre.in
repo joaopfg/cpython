@@ -831,8 +831,6 @@ Python/initconfig.o: $(srcdir)/Python/initconfig.c
 		-DPLATLIBDIR='"$(PLATLIBDIR)"' \
 		-o $@ $(srcdir)/Python/initconfig.c
 
-Modules/customcrypt.o: $(srcdir)/Modules/customcrypt.c $(srcdir)/Modules/customcrypt.h
-
 $(IO_OBJS): $(IO_H)
 
 .PHONY: regen-grammar

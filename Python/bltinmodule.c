@@ -683,7 +683,6 @@ builtin_chr_impl(PyObject *module, int i)
     return PyUnicode_FromOrdinal(i);
 }
 
-
 /*[clinic input]
 compile as builtin_compile
 
@@ -804,8 +803,8 @@ builtin_compile_impl(PyObject *module, PyObject *source, PyObject *filename,
     }
 
     //printf("entry builtin_compile_impl\n");
-    //str = modified_Py_SourceAsString(source, "compile", "string, bytes or AST", &cf, &source_copy);
-    str = _Py_SourceAsString(source, "compile", "string, bytes or AST", &cf, &source_copy);
+    str = modified_Py_SourceAsString(source, "compile", "string, bytes or AST", &cf, &source_copy);
+    //str = _Py_SourceAsString(source, "compile", "string, bytes or AST", &cf, &source_copy);
     if (str == NULL)
         goto error;
 

@@ -270,11 +270,8 @@ sed -e 's/[ 	]*#.*//' -e '/^[ 	]*$/d' |
 	INITBITS=
 	for mod in $MODS
 	do
-	  if [[ $mod != "customcrypt" ]]
-	  then
-	    EXTDECLS="${EXTDECLS}extern PyObject* PyInit_$mod(void);$NL"
-      INITBITS="${INITBITS}    {\"$mod\", PyInit_$mod},$NL"
-	  fi
+	  EXTDECLS="${EXTDECLS}extern PyObject* PyInit_$mod(void);$NL"
+    INITBITS="${INITBITS}    {\"$mod\", PyInit_$mod},$NL"
 	done
 
 

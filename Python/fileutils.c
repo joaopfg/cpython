@@ -1763,7 +1763,7 @@ modified_Py_wfopen(const wchar_t *path, const wchar_t *mode)
     FILE *f;
 
     if (PySys_Audit("open", "uui", path, mode, 0) < 0) {
-        printf("failed in PySys_Audit\n");
+        //printf("failed in PySys_Audit\n");
         return NULL;
     }
 
