@@ -23,7 +23,6 @@
 *.dyn
 .gdb_history
 .purify
-__pycache__
 .hg/
 .svn/
 .idea/
