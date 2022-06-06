@@ -11,6 +11,7 @@
 *.dylib
 *.dll
 *.orig
+*.pyc
 *.pyd
 *.pyo
 *.rej
@@ -22,6 +23,7 @@
 *.dyn
 .gdb_history
 .purify
+__pycache__
 .hg/
 .svn/
 .idea/
