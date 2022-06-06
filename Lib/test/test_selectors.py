@@ -6,7 +6,6 @@ import signal
 import socket
 import sys
 from test import support
-from test.support import os_helper
 from test.support import socket_helper
 from time import sleep
 import unittest
@@ -17,10 +16,6 @@ try:
     import resource
 except ImportError:
     resource = None
-
-
-if support.is_emscripten or support.is_wasi:
-    raise unittest.SkipTest("Cannot create socketpair on Emscripten/WASI.")
 
 
 if hasattr(socket, 'socketpair'):
@@ -544,7 +539,7 @@ class KqueueSelectorTestCase(BaseSelectorTestCase, ScalableSelectorMixIn,
         # a file descriptor that's been closed should raise an OSError
         # with EBADF
         s = self.SELECTOR()
-        bad_f = os_helper.make_bad_fd()
+        bad_f = support.make_bad_fd()
         with self.assertRaises(OSError) as cm:
             s.register(bad_f, selectors.EVENT_READ)
         self.assertEqual(cm.exception.errno, errno.EBADF)

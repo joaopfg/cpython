@@ -30,10 +30,7 @@ from io import BytesIO
 
 import unittest
 from test import support
-from test.support import os_helper
-from test.support import threading_helper
 
-support.requires_working_socket(module=True)
 
 class NoLogRequestHandler:
     def log_message(self, *args):
@@ -67,8 +64,8 @@ class TestServerThread(threading.Thread):
 
 class BaseTestCase(unittest.TestCase):
     def setUp(self):
-        self._threads = threading_helper.threading_setup()
-        os.environ = os_helper.EnvironmentVarGuard()
+        self._threads = support.threading_setup()
+        os.environ = support.EnvironmentVarGuard()
         self.server_started = threading.Event()
         self.thread = TestServerThread(self, self.request_handler)
         self.thread.start()
@@ -78,7 +75,7 @@ class BaseTestCase(unittest.TestCase):
         self.thread.stop()
         self.thread = None
         os.environ.__exit__()
-        threading_helper.threading_cleanup(*self._threads)
+        support.threading_cleanup(*self._threads)
 
     def request(self, uri, method='GET', body=None, headers={}):
         self.connection = http.client.HTTPConnection(self.HOST, self.PORT)
@@ -393,13 +390,13 @@ class SimpleHTTPServerTestCase(BaseTestCase):
                      'undecodable name cannot always be decoded on macOS')
     @unittest.skipIf(sys.platform == 'win32',
                      'undecodable name cannot be decoded on win32')
-    @unittest.skipUnless(os_helper.TESTFN_UNDECODABLE,
-                         'need os_helper.TESTFN_UNDECODABLE')
+    @unittest.skipUnless(support.TESTFN_UNDECODABLE,
+                         'need support.TESTFN_UNDECODABLE')
     def test_undecodable_filename(self):
         enc = sys.getfilesystemencoding()
-        filename = os.fsdecode(os_helper.TESTFN_UNDECODABLE) + '.txt'
+        filename = os.fsdecode(support.TESTFN_UNDECODABLE) + '.txt'
         with open(os.path.join(self.tempdir, filename), 'wb') as f:
-            f.write(os_helper.TESTFN_UNDECODABLE)
+            f.write(support.TESTFN_UNDECODABLE)
         response = self.request(self.base_url + '/')
         if sys.platform == 'darwin':
             # On Mac OS the HFS+ filesystem replaces bytes that aren't valid
@@ -416,7 +413,7 @@ class SimpleHTTPServerTestCase(BaseTestCase):
                       .encode(enc, 'surrogateescape'), body)
         response = self.request(self.base_url + '/' + quotedname)
         self.check_status_and_reason(response, HTTPStatus.OK,
-                                     data=os_helper.TESTFN_UNDECODABLE)
+                                     data=support.TESTFN_UNDECODABLE)
 
     def test_get(self):
         #constructs the path relative to the root directory of the HTTPServer
@@ -543,7 +540,7 @@ class SimpleHTTPServerTestCase(BaseTestCase):
         fullpath = os.path.join(self.tempdir, filename)
 
         try:
-            open(fullpath, 'wb').close()
+            open(fullpath, 'w').close()
         except OSError:
             raise unittest.SkipTest('Can not create file %s on current file '
                                     'system' % filename)
@@ -570,19 +567,14 @@ print("Hello World")
 
 cgi_file2 = """\
 #!%s
-import os
-import sys
-import urllib.parse
+import cgi
 
 print("Content-type: text/html")
 print()
 
-content_length = int(os.environ["CONTENT_LENGTH"])
-query_string = sys.stdin.buffer.read(content_length)
-params = {key.decode("utf-8"): val.decode("utf-8")
-            for key, val in urllib.parse.parse_qsl(query_string)}
-
-print("%%s, %%s, %%s" %% (params["spam"], params["eggs"], params["bacon"]))
+form = cgi.FieldStorage()
+print("%%s, %%s, %%s" %% (form.getfirst("spam"), form.getfirst("eggs"),
+                          form.getfirst("bacon")))
 """
 
 cgi_file4 = """\
@@ -646,7 +638,7 @@ class CGIHTTPServerTestCase(BaseTestCase):
         # The shebang line should be pure ASCII: use symlink if possible.
         # See issue #7668.
         self._pythonexe_symlink = None
-        if os_helper.can_symlink():
+        if support.can_symlink():
             self.pythonexe = os.path.join(self.parent_dir, 'python')
             self._pythonexe_symlink = support.PythonSymlink(self.pythonexe).__enter__()
         else:
@@ -662,7 +654,7 @@ class CGIHTTPServerTestCase(BaseTestCase):
             self.skipTest("Python executable path is not encodable to utf-8")
 
         self.nocgi_path = os.path.join(self.parent_dir, 'nocgi.py')
-        with open(self.nocgi_path, 'w', encoding='utf-8') as fp:
+        with open(self.nocgi_path, 'w') as fp:
             fp.write(cgi_file1 % self.pythonexe)
         os.chmod(self.nocgi_path, 0o777)
 
@@ -1238,9 +1230,9 @@ class SimpleHTTPRequestHandlerTestCase(unittest.TestCase):
 class MiscTestCase(unittest.TestCase):
     def test_all(self):
         expected = []
-        denylist = {'executable', 'nobody_uid', 'test'}
+        blacklist = {'executable', 'nobody_uid', 'test'}
         for name in dir(server):
-            if name.startswith('_') or name in denylist:
+            if name.startswith('_') or name in blacklist:
                 continue
             module_object = getattr(server, name)
             if getattr(module_object, '__module__', None) == 'http.server':

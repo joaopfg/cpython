@@ -1,12 +1,10 @@
 import unittest
 import dbm
+import os
 import shelve
 import glob
 import pickle
-import os
-
 from test import support
-from test.support import os_helper
 from collections.abc import MutableMapping
 from test.test_dbm import dbm_iterator
 
@@ -45,8 +43,8 @@ class byteskeydict(MutableMapping):
 
 
 class TestCase(unittest.TestCase):
-    dirname = os_helper.TESTFN
-    fn = os.path.join(os_helper.TESTFN, "shelftemp.db")
+    dirname = support.TESTFN
+    fn = os.path.join(support.TESTFN, "shelftemp.db")
 
     def test_close(self):
         d1 = {}
@@ -63,11 +61,10 @@ class TestCase(unittest.TestCase):
         else:
             self.fail('Closed shelf should not find a key')
 
-    def test_open_template(self, filename=None, protocol=None):
+    def test_open_template(self, protocol=None):
         os.mkdir(self.dirname)
-        self.addCleanup(os_helper.rmtree, self.dirname)
-        s = shelve.open(filename=filename if filename is not None else self.fn,
-                        protocol=protocol)
+        self.addCleanup(support.rmtree, self.dirname)
+        s = shelve.open(self.fn, protocol=protocol)
         try:
             s['key1'] = (1,2,3,4)
             self.assertEqual(s['key1'], (1,2,3,4))
@@ -82,15 +79,6 @@ class TestCase(unittest.TestCase):
 
     def test_proto2_file_shelf(self):
         self.test_open_template(protocol=2)
-
-    def test_pathlib_path_file_shelf(self):
-        self.test_open_template(filename=os_helper.FakePath(self.fn))
-
-    def test_bytes_path_file_shelf(self):
-        self.test_open_template(filename=os.fsencode(self.fn))
-
-    def test_pathlib_bytes_path_file_shelf(self):
-        self.test_open_template(filename=os_helper.FakePath(os.fsencode(self.fn)))
 
     def test_in_memory_shelf(self):
         d1 = byteskeydict()
@@ -165,7 +153,7 @@ class TestCase(unittest.TestCase):
 
     def test_default_protocol(self):
         with shelve.Shelf({}) as s:
-            self.assertEqual(s._protocol, pickle.DEFAULT_PROTOCOL)
+            self.assertEqual(s._protocol, 3)
 
 
 class TestShelveBase:
@@ -190,9 +178,9 @@ class TestShelveFileBase(TestShelveBase):
         return x
 
     def setUp(self):
-        dirname = os_helper.TESTFN
+        dirname = support.TESTFN
         os.mkdir(dirname)
-        self.addCleanup(os_helper.rmtree, dirname)
+        self.addCleanup(support.rmtree, dirname)
         self.base_path = os.path.join(dirname, "shelftemp.db")
         self.addCleanup(setattr, dbm, '_defaultmod', dbm._defaultmod)
         dbm._defaultmod = self.dbm_mod

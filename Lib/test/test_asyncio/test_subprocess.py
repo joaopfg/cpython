@@ -10,13 +10,9 @@ from asyncio import base_subprocess
 from asyncio import subprocess
 from test.test_asyncio import utils as test_utils
 from test import support
-from test.support import os_helper
 
 if sys.platform != 'win32':
     from asyncio import unix_events
-
-if support.check_sanitizer(address=True):
-    raise unittest.SkipTest("Exposes ASAN flakiness in GitHub CI")
 
 # Program blocking
 PROGRAM_BLOCKED = [sys.executable, '-c', 'import time; time.sleep(3600)']
@@ -630,13 +626,33 @@ class SubprocessMixin:
     def test_create_subprocess_exec_with_path(self):
         async def execute():
             p = await subprocess.create_subprocess_exec(
-                os_helper.FakePath(sys.executable), '-c', 'pass')
+                support.FakePath(sys.executable), '-c', 'pass')
             await p.wait()
             p = await subprocess.create_subprocess_exec(
-                sys.executable, '-c', 'pass', os_helper.FakePath('.'))
+                sys.executable, '-c', 'pass', support.FakePath('.'))
             await p.wait()
 
         self.assertIsNone(self.loop.run_until_complete(execute()))
+
+    def test_exec_loop_deprecated(self):
+        async def go():
+            with self.assertWarns(DeprecationWarning):
+                proc = await asyncio.create_subprocess_exec(
+                    sys.executable, '-c', 'pass',
+                    loop=self.loop,
+                )
+            await proc.wait()
+        self.loop.run_until_complete(go())
+
+    def test_shell_loop_deprecated(self):
+        async def go():
+            with self.assertWarns(DeprecationWarning):
+                proc = await asyncio.create_subprocess_shell(
+                    "exit 0",
+                    loop=self.loop,
+                )
+            await proc.wait()
+        self.loop.run_until_complete(go())
 
 
 if sys.platform != 'win32':
@@ -723,7 +739,7 @@ class GenericWatcherTests:
 
             with self.assertRaises(RuntimeError):
                 await subprocess.create_subprocess_exec(
-                    os_helper.FakePath(sys.executable), '-c', 'pass')
+                    support.FakePath(sys.executable), '-c', 'pass')
 
             watcher.add_child_handler.assert_not_called()
 

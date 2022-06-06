@@ -7,7 +7,6 @@ from unittest.mock import patch
 from test.support.script_helper import (assert_python_ok, assert_python_failure,
                                         interpreter_requires_environment)
 from test import support
-from test.support import os_helper
 
 try:
     import _testcapi
@@ -307,11 +306,11 @@ class TestTracemallocEnabled(unittest.TestCase):
         self.assertGreater(snapshot.traces[1].traceback.total_nframe, 10)
 
         # write on disk
-        snapshot.dump(os_helper.TESTFN)
-        self.addCleanup(os_helper.unlink, os_helper.TESTFN)
+        snapshot.dump(support.TESTFN)
+        self.addCleanup(support.unlink, support.TESTFN)
 
         # load from disk
-        snapshot2 = tracemalloc.Snapshot.load(os_helper.TESTFN)
+        snapshot2 = tracemalloc.Snapshot.load(support.TESTFN)
         self.assertEqual(snapshot2.traces, snapshot.traces)
 
         # tracemalloc must be tracing memory allocations to take a snapshot
@@ -326,11 +325,11 @@ class TestTracemallocEnabled(unittest.TestCase):
         # take a snapshot with a new attribute
         snapshot = tracemalloc.take_snapshot()
         snapshot.test_attr = "new"
-        snapshot.dump(os_helper.TESTFN)
-        self.addCleanup(os_helper.unlink, os_helper.TESTFN)
+        snapshot.dump(support.TESTFN)
+        self.addCleanup(support.unlink, support.TESTFN)
 
         # load() should recreate the attribute
-        snapshot2 = tracemalloc.Snapshot.load(os_helper.TESTFN)
+        snapshot2 = tracemalloc.Snapshot.load(support.TESTFN)
         self.assertEqual(snapshot2.test_attr, "new")
 
     def fork_child(self):
@@ -346,7 +345,7 @@ class TestTracemallocEnabled(unittest.TestCase):
         # everything is fine
         return 0
 
-    @support.requires_fork()
+    @unittest.skipUnless(hasattr(os, 'fork'), 'need os.fork()')
     def test_fork(self):
         # check that tracemalloc is still working after fork
         pid = os.fork()

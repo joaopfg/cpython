@@ -1,13 +1,10 @@
+import imghdr
 import io
 import os
 import pathlib
 import unittest
 import warnings
-from test.support import findfile, warnings_helper
-from test.support.os_helper import TESTFN, unlink
-
-imghdr = warnings_helper.import_deprecated("imghdr")
-
+from test.support import findfile, TESTFN, unlink
 
 TEST_FILES = (
     ('python.png', 'png'),
@@ -17,7 +14,6 @@ TEST_FILES = (
     ('python.pgm', 'pgm'),
     ('python.pbm', 'pbm'),
     ('python.jpg', 'jpeg'),
-    ('python-raw.jpg', 'jpeg'),  # raw JPEG without JFIF/EXIF markers
     ('python.ras', 'rast'),
     ('python.sgi', 'rgb'),
     ('python.tiff', 'tiff'),

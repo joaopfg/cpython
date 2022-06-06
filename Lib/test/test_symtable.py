@@ -67,13 +67,6 @@ class SymtableTest(unittest.TestCase):
         self.assertEqual(self.spam.get_type(), "function")
         self.assertEqual(self.internal.get_type(), "function")
 
-    def test_id(self):
-        self.assertGreater(self.top.get_id(), 0)
-        self.assertGreater(self.Mine.get_id(), 0)
-        self.assertGreater(self.a_method.get_id(), 0)
-        self.assertGreater(self.spam.get_id(), 0)
-        self.assertGreater(self.internal.get_id(), 0)
-
     def test_optimized(self):
         self.assertFalse(self.top.is_optimized())
 
@@ -158,10 +151,6 @@ class SymtableTest(unittest.TestCase):
         ns_test = self.top.lookup("namespace_test")
         self.assertEqual(len(ns_test.get_namespaces()), 2)
         self.assertRaises(ValueError, ns_test.get_namespace)
-
-        ns_test_2 = self.top.lookup("glob")
-        self.assertEqual(len(ns_test_2.get_namespaces()), 0)
-        self.assertRaises(ValueError, ns_test_2.get_namespace)
 
     def test_assigned(self):
         self.assertTrue(self.spam.lookup("x").is_assigned())

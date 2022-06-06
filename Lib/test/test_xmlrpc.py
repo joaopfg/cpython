@@ -15,17 +15,13 @@ import re
 import io
 import contextlib
 from test import support
-from test.support import os_helper
 from test.support import socket_helper
-from test.support import threading_helper
 from test.support import ALWAYS_EQ, LARGEST, SMALLEST
 
 try:
     import gzip
 except ImportError:
     gzip = None
-
-support.requires_working_socket(module=True)
 
 alist = [{'astring': 'foo@bar.baz.spam',
           'afloat': 7283.43,
@@ -650,7 +646,7 @@ def http_server(evt, numrequests, requestHandler=None, encoding=None):
             serv.handle_request()
             numrequests -= 1
 
-    except TimeoutError:
+    except socket.timeout:
         pass
     finally:
         serv.socket.close()
@@ -720,7 +716,7 @@ def http_multi_server(evt, numrequests, requestHandler=None):
             serv.handle_request()
             numrequests -= 1
 
-    except TimeoutError:
+    except socket.timeout:
         pass
     finally:
         serv.socket.close()
@@ -1413,7 +1409,7 @@ class CGIHandlerTestCase(unittest.TestCase):
         self.cgi = None
 
     def test_cgi_get(self):
-        with os_helper.EnvironmentVarGuard() as env:
+        with support.EnvironmentVarGuard() as env:
             env['REQUEST_METHOD'] = 'GET'
             # if the method is GET and no request_text is given, it runs handle_get
             # get sysout output
@@ -1445,7 +1441,7 @@ class CGIHandlerTestCase(unittest.TestCase):
         </methodCall>
         """
 
-        with os_helper.EnvironmentVarGuard() as env, \
+        with support.EnvironmentVarGuard() as env, \
              captured_stdout(encoding=self.cgi.encoding) as data_out, \
              support.captured_stdin() as data_in:
             data_in.write(data)
@@ -1507,8 +1503,8 @@ class UseBuiltinTypesTestCase(unittest.TestCase):
 
 
 def setUpModule():
-    thread_info = threading_helper.threading_setup()
-    unittest.addModuleCleanup(threading_helper.threading_cleanup, *thread_info)
+    thread_info = support.threading_setup()
+    unittest.addModuleCleanup(support.threading_cleanup, *thread_info)
 
 
 if __name__ == "__main__":

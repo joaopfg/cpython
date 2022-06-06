@@ -5,7 +5,6 @@ import unittest
 import urllib.robotparser
 from test import support
 from test.support import socket_helper
-from test.support import threading_helper
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
@@ -308,10 +307,6 @@ class RobotHandler(BaseHTTPRequestHandler):
         pass
 
 
-@unittest.skipUnless(
-    support.has_socket_support,
-    "Socket server requires working socket."
-)
 class PasswordProtectedSiteTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -335,7 +330,7 @@ class PasswordProtectedSiteTestCase(unittest.TestCase):
         self.t.join()
         self.server.server_close()
 
-    @threading_helper.reap_threads
+    @support.reap_threads
     def testPasswordProtectedSite(self):
         addr = self.server.server_address
         url = 'http://' + socket_helper.HOST + ':' + str(addr[1])
@@ -346,7 +341,6 @@ class PasswordProtectedSiteTestCase(unittest.TestCase):
         self.assertFalse(parser.can_fetch("*", robots_url))
 
 
-@support.requires_working_socket()
 class NetworkTestCase(unittest.TestCase):
 
     base_url = 'http://www.pythontest.net/'

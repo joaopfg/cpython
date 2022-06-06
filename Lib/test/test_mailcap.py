@@ -1,15 +1,8 @@
-import copy
+import mailcap
 import os
-import sys
+import copy
 import test.support
 import unittest
-import warnings
-from test.support import os_helper
-from test.support import warnings_helper
-
-
-mailcap = warnings_helper.import_deprecated('mailcap')
-
 
 # Location of mailcap file
 MAILCAPFILE = test.support.findfile("mailcap.txt")
@@ -81,7 +74,7 @@ class HelperFunctionTest(unittest.TestCase):
         self.assertIsInstance(mcfiles, list)
         for m in mcfiles:
             self.assertIsInstance(m, str)
-        with os_helper.EnvironmentVarGuard() as env:
+        with test.support.EnvironmentVarGuard() as env:
             # According to RFC 1524, if MAILCAPS env variable exists, use that
             # and only that.
             if "MAILCAPS" in env:
@@ -143,7 +136,7 @@ class GetcapsTest(unittest.TestCase):
         # Test mailcap.getcaps() using mock mailcap file in this dir.
         # Temporarily override any existing system mailcap file by pointing the
         # MAILCAPS environment variable to our mock file.
-        with os_helper.EnvironmentVarGuard() as env:
+        with test.support.EnvironmentVarGuard() as env:
             env["MAILCAPS"] = MAILCAPFILE
             caps = mailcap.getcaps()
             self.assertDictEqual(caps, MAILCAPDICT)
@@ -220,7 +213,6 @@ class FindmatchTest(unittest.TestCase):
         self._run_cases(cases)
 
     @unittest.skipUnless(os.name == "posix", "Requires 'test' command on system")
-    @unittest.skipIf(sys.platform == "vxworks", "'test' command is not supported on VxWorks")
     def test_test(self):
         # findmatch() will automatically check any "test" conditions and skip
         # the entry if the check fails.

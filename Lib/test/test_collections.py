@@ -7,7 +7,6 @@ import inspect
 import operator
 import pickle
 from random import choice, randrange
-from itertools import product, chain, combinations
 import string
 import sys
 from test import support
@@ -70,14 +69,6 @@ class TestUserObjects(unittest.TestCase):
         obj = UserDict()
         obj[123] = "abc"
         self._copy_test(obj)
-
-    def test_dict_missing(self):
-        class A(UserDict):
-            def __missing__(self, key):
-                return 456
-        self.assertEqual(A()[123], 456)
-        # get() ignores __missing__ on dict
-        self.assertIs(A().get(123), None)
 
 
 ################################################################################
@@ -256,10 +247,6 @@ class TestChainMap(unittest.TestCase):
             self.assertIn(key, d)
         for k, v in dict(a=1, B=20, C=30, z=100).items():             # check get
             self.assertEqual(d.get(k, 100), v)
-
-        c = ChainMap({'a': 1, 'b': 2})
-        d = c.new_child(b=20, c=30)
-        self.assertEqual(d.maps, [{'b': 20, 'c': 30}, {'a': 1, 'b': 2}])
 
     def test_union_operators(self):
         cm1 = ChainMap(dict(a=1, b=2), dict(c=3, d=4))
@@ -685,38 +672,19 @@ class TestNamedTuple(unittest.TestCase):
         self.assertRaises(AttributeError, Point.x.__set__, p, 33)
         self.assertRaises(AttributeError, Point.x.__delete__, p)
 
-        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
-            with self.subTest(proto=proto):
-                class NewPoint(tuple):
-                    x = pickle.loads(pickle.dumps(Point.x, proto))
-                    y = pickle.loads(pickle.dumps(Point.y, proto))
+        class NewPoint(tuple):
+            x = pickle.loads(pickle.dumps(Point.x))
+            y = pickle.loads(pickle.dumps(Point.y))
 
-                np = NewPoint([1, 2])
+        np = NewPoint([1, 2])
 
-                self.assertEqual(np.x, 1)
-                self.assertEqual(np.y, 2)
+        self.assertEqual(np.x, 1)
+        self.assertEqual(np.y, 2)
 
     def test_new_builtins_issue_43102(self):
-        obj = namedtuple('C', ())
-        new_func = obj.__new__
-        self.assertEqual(new_func.__globals__['__builtins__'], {})
-        self.assertEqual(new_func.__builtins__, {})
-
-    def test_match_args(self):
-        Point = namedtuple('Point', 'x y')
-        self.assertEqual(Point.__match_args__, ('x', 'y'))
-
-    def test_non_generic_subscript(self):
-        # For backward compatibility, subscription works
-        # on arbitrary named tuple types.
-        Group = collections.namedtuple('Group', 'key group')
-        A = Group[int, list[int]]
-        self.assertEqual(A.__origin__, Group)
-        self.assertEqual(A.__parameters__, ())
-        self.assertEqual(A.__args__, (int, list[int]))
-        a = A(1, [2])
-        self.assertIs(type(a), Group)
-        self.assertEqual(a, (1, [2]))
+        self.assertEqual(
+            namedtuple('C', ()).__new__.__globals__['__builtins__'],
+            {})
 
 
 ################################################################################
@@ -1538,7 +1506,7 @@ class TestCollectionABCs(ABCTestCase):
         items = [5,43,2,1]
         s = MySet(items)
         r = s.pop()
-        self.assertEqual(len(s), len(items) - 1)
+        self.assertEquals(len(s), len(items) - 1)
         self.assertNotIn(r, s)
         self.assertIn(r, items)
 
@@ -2002,12 +1970,6 @@ class TestCollectionABCs(ABCTestCase):
         self.assertEqual(len(mss), len(mss2))
         self.assertEqual(list(mss), list(mss2))
 
-    def test_illegal_patma_flags(self):
-        with self.assertRaises(TypeError):
-            class Both(Collection):
-                __abc_tpflags__ = (Sequence.__flags__ | Mapping.__flags__)
-
-
 
 ################################################################################
 ### Counter
@@ -2100,10 +2062,6 @@ class TestCounter(unittest.TestCase):
         self.assertRaises(TypeError, Counter, 42)
         self.assertRaises(TypeError, Counter, (), ())
         self.assertRaises(TypeError, Counter.__init__)
-
-    def test_total(self):
-        c = Counter(a=10, b=5, c=0)
-        self.assertEqual(c.total(), 15)
 
     def test_order_preservation(self):
         # Input order dictates items() order
@@ -2258,6 +2216,29 @@ class TestCounter(unittest.TestCase):
                 set_result = setop(set(p.elements()), set(q.elements()))
                 self.assertEqual(counter_result, dict.fromkeys(set_result, 1))
 
+    def test_subset_superset_not_implemented(self):
+        # Verify that multiset comparison operations are not implemented.
+
+        # These operations were intentionally omitted because multiset
+        # comparison semantics conflict with existing dict equality semantics.
+
+        # For multisets, we would expect that if p<=q and p>=q are both true,
+        # then p==q.  However, dict equality semantics require that p!=q when
+        # one of sets contains an element with a zero count and the other
+        # doesn't.
+
+        p = Counter(a=1, b=0)
+        q = Counter(a=1, c=0)
+        self.assertNotEqual(p, q)
+        with self.assertRaises(TypeError):
+            p < q
+        with self.assertRaises(TypeError):
+            p <= q
+        with self.assertRaises(TypeError):
+            p > q
+        with self.assertRaises(TypeError):
+            p >= q
+
     def test_inplace_operations(self):
         elements = 'abcd'
         for i in range(1000):
@@ -2332,52 +2313,20 @@ class TestCounter(unittest.TestCase):
         self.assertTrue(c.called)
         self.assertEqual(dict(c), {'a': 5, 'b': 2, 'c': 1, 'd': 1, 'r':2 })
 
-    def test_multiset_operations_equivalent_to_set_operations(self):
-        # When the multiplicities are all zero or one, multiset operations
-        # are guaranteed to be equivalent to the corresponding operations
-        # for regular sets.
-        s = list(product(('a', 'b', 'c'), range(2)))
-        powerset = chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
-        counters = [Counter(dict(groups)) for groups in powerset]
-        for cp, cq in product(counters, repeat=2):
-            sp = set(cp.elements())
-            sq = set(cq.elements())
-            self.assertEqual(set(cp + cq), sp | sq)
-            self.assertEqual(set(cp - cq), sp - sq)
-            self.assertEqual(set(cp | cq), sp | sq)
-            self.assertEqual(set(cp & cq), sp & sq)
-            self.assertEqual(cp == cq, sp == sq)
-            self.assertEqual(cp != cq, sp != sq)
-            self.assertEqual(cp <= cq, sp <= sq)
-            self.assertEqual(cp >= cq, sp >= sq)
-            self.assertEqual(cp < cq, sp < sq)
-            self.assertEqual(cp > cq, sp > sq)
 
-    def test_eq(self):
-        self.assertEqual(Counter(a=3, b=2, c=0), Counter('ababa'))
-        self.assertNotEqual(Counter(a=3, b=2), Counter('babab'))
+################################################################################
+### Run tests
+################################################################################
 
-    def test_le(self):
-        self.assertTrue(Counter(a=3, b=2, c=0) <= Counter('ababa'))
-        self.assertFalse(Counter(a=3, b=2) <= Counter('babab'))
-
-    def test_lt(self):
-        self.assertTrue(Counter(a=3, b=1, c=0) < Counter('ababa'))
-        self.assertFalse(Counter(a=3, b=2, c=0) < Counter('ababa'))
-
-    def test_ge(self):
-        self.assertTrue(Counter(a=2, b=1, c=0) >= Counter('aab'))
-        self.assertFalse(Counter(a=3, b=2, c=0) >= Counter('aabd'))
-
-    def test_gt(self):
-        self.assertTrue(Counter(a=3, b=2, c=0) > Counter('aab'))
-        self.assertFalse(Counter(a=2, b=1, c=0) > Counter('aab'))
-
-
-def load_tests(loader, tests, pattern):
-    tests.addTest(doctest.DocTestSuite(collections))
-    return tests
+def test_main(verbose=None):
+    NamedTupleDocs = doctest.DocTestSuite(module=collections)
+    test_classes = [TestNamedTuple, NamedTupleDocs, TestOneTrickPonyABCs,
+                    TestCollectionABCs, TestCounter, TestChainMap,
+                    TestUserObjects,
+                    ]
+    support.run_unittest(*test_classes)
+    support.run_doctest(collections, verbose)
 
 
 if __name__ == "__main__":
-    unittest.main()
+    test_main(verbose=True)

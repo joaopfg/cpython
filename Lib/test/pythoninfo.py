@@ -6,7 +6,6 @@ import errno
 import re
 import sys
 import traceback
-import unittest
 import warnings
 
 
@@ -79,7 +78,6 @@ def call_func(info_add, name, mod, func_name, *, formatter=None):
 
 def collect_sys(info_add):
     attributes = (
-        '_emscripten_info',
         '_framework',
         'abiflags',
         'api_version',
@@ -98,7 +96,6 @@ def collect_sys(info_add):
         'maxunicode',
         'path',
         'platform',
-        'platlibdir',
         'prefix',
         'thread_info',
         'version',
@@ -156,7 +153,7 @@ def collect_platform(info_add):
 def collect_locale(info_add):
     import locale
 
-    info_add('locale.getencoding', locale.getencoding())
+    info_add('locale.encoding', locale.getpreferredencoding(False))
 
 
 def collect_builtins(info_add):
@@ -436,15 +433,6 @@ def collect_time(info_add):
                 info_add('time.get_clock_info(%s)' % clock, clock_info)
 
 
-def collect_curses(info_add):
-    try:
-        import curses
-    except ImportError:
-        return
-
-    copy_attr(info_add, 'curses.ncurses_version', curses, 'ncurses_version')
-
-
 def collect_datetime(info_add):
     try:
         import datetime
@@ -516,7 +504,7 @@ def collect_ssl(info_add):
     copy_attributes(info_add, ssl, 'ssl.%s', attributes, formatter=format_attr)
 
     for name, ctx in (
-        ('SSLContext', ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)),
+        ('SSLContext', ssl.SSLContext()),
         ('default_https_context', ssl._create_default_https_context()),
         ('stdlib_context', ssl._create_stdlib_context()),
     ):
@@ -545,14 +533,8 @@ def collect_ssl(info_add):
 def collect_socket(info_add):
     import socket
 
-    try:
-        hostname = socket.gethostname()
-    except OSError:
-        # WASI SDK 15.0 does not have gethostname(2).
-        if sys.platform != "wasi":
-            raise
-    else:
-        info_add('socket.hostname', hostname)
+    hostname = socket.gethostname()
+    info_add('socket.hostname', hostname)
 
 
 def collect_sqlite(info_add):
@@ -623,7 +605,7 @@ def collect_resource(info_add):
 def collect_test_socket(info_add):
     try:
         from test import test_socket
-    except (ImportError, unittest.SkipTest):
+    except ImportError:
         return
 
     # all check attributes like HAVE_SOCKET_CAN
@@ -811,7 +793,6 @@ def collect_info(info):
 
         collect_builtins,
         collect_cc,
-        collect_curses,
         collect_datetime,
         collect_decimal,
         collect_expat,

@@ -34,7 +34,6 @@ from asyncio import futures
 from asyncio import tasks
 from asyncio.log import logger
 from test import support
-from test.support import threading_helper
 
 
 def data_file(filename):
@@ -91,7 +90,7 @@ def dummy_ssl_context():
     if ssl is None:
         return None
     else:
-        return simple_client_sslcontext(disable_verify=True)
+        return ssl.SSLContext(ssl.PROTOCOL_TLS)
 
 
 def run_briefly(loop):
@@ -158,7 +157,7 @@ class SSLWSGIServerMixin:
         # contains the ssl key and certificate files) differs
         # between the stdlib and stand-alone asyncio.
         # Prefer our own if we can find it.
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context = ssl.SSLContext()
         context.load_cert_chain(ONLYCERT, ONLYKEY)
 
         ssock = context.wrap_socket(request, server_side=True)
@@ -279,31 +278,6 @@ def run_test_server(*, host='127.0.0.1', port=0, use_ssl=False):
     yield from _run_test_server(address=(host, port), use_ssl=use_ssl,
                                 server_cls=SilentWSGIServer,
                                 server_ssl_cls=SSLWSGIServer)
-
-
-def echo_datagrams(sock):
-    while True:
-        data, addr = sock.recvfrom(4096)
-        if data == b'STOP':
-            sock.close()
-            break
-        else:
-            sock.sendto(data, addr)
-
-
-@contextlib.contextmanager
-def run_udp_echo_server(*, host='127.0.0.1', port=0):
-    addr_info = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)
-    family, type, proto, _, sockaddr = addr_info[0]
-    sock = socket.socket(family, type, proto)
-    sock.bind((host, port))
-    thread = threading.Thread(target=lambda: echo_datagrams(sock))
-    thread.start()
-    try:
-        yield sock.getsockname()
-    finally:
-        sock.sendto(b'STOP', sock.getsockname())
-        thread.join()
 
 
 def make_test_protocol(base):
@@ -434,13 +408,12 @@ class TestLoop(base_events.BaseEventLoop):
             return False
 
     def assert_writer(self, fd, callback, *args):
-        if fd not in self.writers:
-            raise AssertionError(f'fd {fd} is not registered')
+        assert fd in self.writers, 'fd {} is not registered'.format(fd)
         handle = self.writers[fd]
-        if handle._callback != callback:
-            raise AssertionError(f'{handle._callback!r} != {callback!r}')
-        if handle._args != args:
-            raise AssertionError(f'{handle._args!r} != {args!r}')
+        assert handle._callback == callback, '{!r} != {!r}'.format(
+            handle._callback, callback)
+        assert handle._args == args, '{!r} != {!r}'.format(
+            handle._args, args)
 
     def _ensure_fd_no_transport(self, fd):
         if not isinstance(fd, int):
@@ -556,8 +529,7 @@ class TestCase(unittest.TestCase):
                         thread.join()
 
     def set_event_loop(self, loop, *, cleanup=True):
-        if loop is None:
-            raise AssertionError('loop is None')
+        assert loop is not None
         # ensure that the event loop is passed explicitly in asyncio
         events.set_event_loop(None)
         if cleanup:
@@ -568,10 +540,17 @@ class TestCase(unittest.TestCase):
         self.set_event_loop(loop)
         return loop
 
+    def unpatch_get_running_loop(self):
+        events._get_running_loop = self._get_running_loop
+
     def setUp(self):
-        self._thread_cleanup = threading_helper.threading_setup()
+        self._get_running_loop = events._get_running_loop
+        events._get_running_loop = lambda: None
+        self._thread_cleanup = support.threading_setup()
 
     def tearDown(self):
+        self.unpatch_get_running_loop()
+
         events.set_event_loop(None)
 
         # Detect CPython bug #23353: ensure that yield/yield-from is not used
@@ -579,7 +558,7 @@ class TestCase(unittest.TestCase):
         self.assertEqual(sys.exc_info(), (None, None, None))
 
         self.doCleanups()
-        threading_helper.threading_cleanup(*self._thread_cleanup)
+        support.threading_cleanup(*self._thread_cleanup)
         support.reap_children()
 
 

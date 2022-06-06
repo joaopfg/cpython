@@ -7,10 +7,8 @@ from weakref import proxy
 import io
 import _pyio as pyio
 
-from test.support import gc_collect
-from test.support.os_helper import TESTFN
-from test.support import os_helper
-from test.support import warnings_helper
+from test.support import TESTFN, gc_collect
+from test import support
 from collections import UserList
 
 class AutoFileTests:
@@ -22,7 +20,7 @@ class AutoFileTests:
     def tearDown(self):
         if self.f:
             self.f.close()
-        os_helper.unlink(TESTFN)
+        support.unlink(TESTFN)
 
     def testWeakRefs(self):
         # verify weak references
@@ -54,7 +52,7 @@ class AutoFileTests:
         # verify readinto refuses text files
         a = array('b', b'x'*10)
         self.f.close()
-        self.f = self.open(TESTFN, encoding="utf-8")
+        self.f = self.open(TESTFN, 'r')
         if hasattr(self.f, "readinto"):
             self.assertRaises(TypeError, self.f.readinto, a)
 
@@ -142,7 +140,7 @@ class PyAutoFileTests(AutoFileTests, unittest.TestCase):
 class OtherFileTests:
 
     def tearDown(self):
-        os_helper.unlink(TESTFN)
+        support.unlink(TESTFN)
 
     def testModeStrings(self):
         # check invalid mode strings
@@ -206,7 +204,7 @@ class OtherFileTests:
         # make sure that explicitly setting the buffer size doesn't cause
         # misbehaviour especially with repeated close() calls
         for s in (-1, 0, 512):
-            with warnings_helper.check_no_warnings(self,
+            with support.check_no_warnings(self,
                                            message='line buffering',
                                            category=RuntimeWarning):
                 self._checkBufferSize(s)

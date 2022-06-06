@@ -23,12 +23,7 @@ import weakref
 from functools import partial
 from itertools import product, islice
 from test import support
-from test.support import os_helper
-from test.support import warnings_helper
-from test.support import findfile, gc_collect, swap_attr, swap_item
-from test.support.import_helper import import_fresh_module
-from test.support.os_helper import TESTFN
-
+from test.support import TESTFN, findfile, import_fresh_module, gc_collect, swap_attr, swap_item
 
 # pyET is the pure-Python implementation.
 #
@@ -107,23 +102,10 @@ EXTERNAL_ENTITY_XML = """\
 <document>&entity;</document>
 """
 
-ATTLIST_XML = """\
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE Foo [
-<!ELEMENT foo (bar*)>
-<!ELEMENT bar (#PCDATA)*>
-<!ATTLIST bar xml:lang CDATA "eng">
-<!ENTITY qux "quux">
-]>
-<foo>
-<bar>&qux;</bar>
-</foo>
-"""
-
 def checkwarnings(*filters, quiet=False):
     def decorator(test):
         def newtest(*args, **kwargs):
-            with warnings_helper.check_warnings(*filters, quiet=quiet):
+            with support.check_warnings(*filters, quiet=quiet):
                 test(*args, **kwargs)
         functools.update_wrapper(newtest, test)
         return newtest
@@ -143,7 +125,7 @@ class ModuleTest(unittest.TestCase):
 
     def test_all(self):
         names = ("xml.etree.ElementTree", "_elementtree")
-        support.check__all__(self, ET, names, not_exported=("HTML_EMPTY",))
+        support.check__all__(self, ET, names, blacklist=("HTML_EMPTY",))
 
 
 def serialize(elem, to_string=True, encoding='unicode', **options):
@@ -621,7 +603,7 @@ class ElementTreeTest(unittest.TestCase):
             self.assertFalse(f.closed)
         self.assertEqual(str(cm.exception), "unknown event 'bogus'")
 
-        with warnings_helper.check_no_resource_warning(self):
+        with support.check_no_resource_warning(self):
             with self.assertRaises(ValueError) as cm:
                 iterparse(SIMPLE_XMLFILE, events)
             self.assertEqual(str(cm.exception), "unknown event 'bogus'")
@@ -647,13 +629,13 @@ class ElementTreeTest(unittest.TestCase):
         self.assertEqual(str(cm.exception),
                 'junk after document element: line 1, column 12')
 
-        self.addCleanup(os_helper.unlink, TESTFN)
+        self.addCleanup(support.unlink, TESTFN)
         with open(TESTFN, "wb") as f:
             f.write(b"<document />junk")
         it = iterparse(TESTFN)
         action, elem = next(it)
         self.assertEqual((action, elem.tag), ('end', 'document'))
-        with warnings_helper.check_no_resource_warning(self):
+        with support.check_no_resource_warning(self):
             with self.assertRaises(ET.ParseError) as cm:
                 next(it)
             self.assertEqual(str(cm.exception),
@@ -661,7 +643,7 @@ class ElementTreeTest(unittest.TestCase):
             del cm, it
 
         # Not exhausting the iterator still closes the resource (bpo-43292)
-        with warnings_helper.check_no_resource_warning(self):
+        with support.check_no_resource_warning(self):
             it = iterparse(TESTFN)
             del it
 
@@ -1357,9 +1339,8 @@ class ElementTreeTest(unittest.TestCase):
     def test_html_empty_elems_serialization(self):
         # issue 15970
         # from http://www.w3.org/TR/html401/index/elements.html
-        for element in ['AREA', 'BASE', 'BASEFONT', 'BR', 'COL', 'EMBED', 'FRAME',
-                        'HR', 'IMG', 'INPUT', 'ISINDEX', 'LINK', 'META', 'PARAM',
-                        'SOURCE', 'TRACK', 'WBR']:
+        for element in ['AREA', 'BASE', 'BASEFONT', 'BR', 'COL', 'FRAME', 'HR',
+                        'IMG', 'INPUT', 'ISINDEX', 'LINK', 'META', 'PARAM']:
             for elem in [element, element.lower()]:
                 expected = '<%s>' % elem
                 serialized = serialize(ET.XML('<%s />' % elem), method='html')
@@ -1383,12 +1364,6 @@ class ElementTreeTest(unittest.TestCase):
                          '<cirriculum status="public" company="example" />')
         self.assertEqual(serialize(root, method='html'),
                 '<cirriculum status="public" company="example"></cirriculum>')
-
-    def test_attlist_default(self):
-        # Test default attribute values; See BPO 42151.
-        root = ET.fromstring(ATTLIST_XML)
-        self.assertEqual(root[0].attrib,
-                         {'{http://www.w3.org/XML/1998/namespace}lang': 'eng'})
 
 
 class XMLPullParserTest(unittest.TestCase):
@@ -2523,7 +2498,8 @@ class BasicElementTest(ElementTestCase, unittest.TestCase):
                     <group><dogs>4</dogs>
                     </group>"""
                 e1 = dumper.fromstring(XMLTEXT)
-                self.assertEqual(e1.__getstate__()['tag'], 'group')
+                if hasattr(e1, '__getstate__'):
+                    self.assertEqual(e1.__getstate__()['tag'], 'group')
                 e2 = self.pickleRoundTrip(e1, 'xml.etree.ElementTree',
                                           dumper, loader, proto)
                 self.assertEqual(e2.tag, 'group')
@@ -2882,12 +2858,8 @@ class ElementFindTest(unittest.TestCase):
             ['tag'] * 3)
         self.assertEqual(summarize_list(e.findall('.//tag[@class="a"]')),
             ['tag'])
-        self.assertEqual(summarize_list(e.findall('.//tag[@class!="a"]')),
-            ['tag'] * 2)
         self.assertEqual(summarize_list(e.findall('.//tag[@class="b"]')),
             ['tag'] * 2)
-        self.assertEqual(summarize_list(e.findall('.//tag[@class!="b"]')),
-            ['tag'])
         self.assertEqual(summarize_list(e.findall('.//tag[@id]')),
             ['tag'])
         self.assertEqual(summarize_list(e.findall('.//section[tag]')),
@@ -2909,19 +2881,6 @@ class ElementFindTest(unittest.TestCase):
         self.assertEqual(summarize_list(e.findall(".//section[ tag = 'subtext' ]")),
             ['section'])
 
-        # Negations of above tests. They match nothing because the sole section
-        # tag has subtext.
-        self.assertEqual(summarize_list(e.findall(".//section[tag!='subtext']")),
-            [])
-        self.assertEqual(summarize_list(e.findall(".//section[tag !='subtext']")),
-            [])
-        self.assertEqual(summarize_list(e.findall(".//section[tag!= 'subtext']")),
-            [])
-        self.assertEqual(summarize_list(e.findall(".//section[tag != 'subtext']")),
-            [])
-        self.assertEqual(summarize_list(e.findall(".//section[ tag != 'subtext' ]")),
-            [])
-
         self.assertEqual(summarize_list(e.findall(".//tag[.='subtext']")),
                          ['tag'])
         self.assertEqual(summarize_list(e.findall(".//tag[. ='subtext']")),
@@ -2936,24 +2895,6 @@ class ElementFindTest(unittest.TestCase):
                          [])
         self.assertEqual(summarize_list(e.findall(".//tag[.= ' subtext']")),
                          [])
-
-        # Negations of above tests.
-        #   Matches everything but the tag containing subtext
-        self.assertEqual(summarize_list(e.findall(".//tag[.!='subtext']")),
-                         ['tag'] * 3)
-        self.assertEqual(summarize_list(e.findall(".//tag[. !='subtext']")),
-                         ['tag'] * 3)
-        self.assertEqual(summarize_list(e.findall('.//tag[.!= "subtext"]')),
-                         ['tag'] * 3)
-        self.assertEqual(summarize_list(e.findall('.//tag[ . != "subtext" ]')),
-                         ['tag'] * 3)
-        self.assertEqual(summarize_list(e.findall(".//tag[. != 'subtext']")),
-                         ['tag'] * 3)
-        # Matches all tags.
-        self.assertEqual(summarize_list(e.findall(".//tag[. != 'subtext ']")),
-                         ['tag'] * 4)
-        self.assertEqual(summarize_list(e.findall(".//tag[.!= ' subtext']")),
-                         ['tag'] * 4)
 
         # duplicate section => 2x tag matches
         e[1] = e[2]
@@ -3711,14 +3652,14 @@ class IOTest(unittest.TestCase):
                      "<tag key=\"åöö&lt;&gt;\" />" % enc).encode(enc))
 
     def test_write_to_filename(self):
-        self.addCleanup(os_helper.unlink, TESTFN)
+        self.addCleanup(support.unlink, TESTFN)
         tree = ET.ElementTree(ET.XML('''<site>\xf8</site>'''))
         tree.write(TESTFN)
         with open(TESTFN, 'rb') as f:
             self.assertEqual(f.read(), b'''<site>&#248;</site>''')
 
     def test_write_to_filename_with_encoding(self):
-        self.addCleanup(os_helper.unlink, TESTFN)
+        self.addCleanup(support.unlink, TESTFN)
         tree = ET.ElementTree(ET.XML('''<site>\xf8</site>'''))
         tree.write(TESTFN, encoding='utf-8')
         with open(TESTFN, 'rb') as f:
@@ -3731,10 +3672,10 @@ class IOTest(unittest.TestCase):
                              b'''<site>\xf8</site>'''))
 
     def test_write_to_filename_as_unicode(self):
-        self.addCleanup(os_helper.unlink, TESTFN)
+        self.addCleanup(support.unlink, TESTFN)
         with open(TESTFN, 'w') as f:
             encoding = f.encoding
-        os_helper.unlink(TESTFN)
+        support.unlink(TESTFN)
 
         tree = ET.ElementTree(ET.XML('''<site>\xf8</site>'''))
         tree.write(TESTFN, encoding='unicode')
@@ -3748,7 +3689,7 @@ class IOTest(unittest.TestCase):
                 self.assertIn(expected, data)
 
     def test_write_to_text_file(self):
-        self.addCleanup(os_helper.unlink, TESTFN)
+        self.addCleanup(support.unlink, TESTFN)
         tree = ET.ElementTree(ET.XML('''<site>\xf8</site>'''))
         with open(TESTFN, 'w', encoding='utf-8') as f:
             tree.write(f, encoding='unicode')
@@ -3773,7 +3714,7 @@ class IOTest(unittest.TestCase):
                              b'''<site>\xf8</site>'''))
 
     def test_write_to_binary_file(self):
-        self.addCleanup(os_helper.unlink, TESTFN)
+        self.addCleanup(support.unlink, TESTFN)
         tree = ET.ElementTree(ET.XML('''<site>\xf8</site>'''))
         with open(TESTFN, 'wb') as f:
             tree.write(f)
@@ -3782,7 +3723,7 @@ class IOTest(unittest.TestCase):
             self.assertEqual(f.read(), b'''<site>&#248;</site>''')
 
     def test_write_to_binary_file_with_encoding(self):
-        self.addCleanup(os_helper.unlink, TESTFN)
+        self.addCleanup(support.unlink, TESTFN)
         tree = ET.ElementTree(ET.XML('''<site>\xf8</site>'''))
         with open(TESTFN, 'wb') as f:
             tree.write(f, encoding='utf-8')
@@ -3799,7 +3740,7 @@ class IOTest(unittest.TestCase):
                              b'''<site>\xf8</site>''')
 
     def test_write_to_binary_file_with_bom(self):
-        self.addCleanup(os_helper.unlink, TESTFN)
+        self.addCleanup(support.unlink, TESTFN)
         tree = ET.ElementTree(ET.XML('''<site>\xf8</site>'''))
         # test BOM writing to buffered file
         with open(TESTFN, 'wb') as f:

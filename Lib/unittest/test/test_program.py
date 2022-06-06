@@ -61,17 +61,6 @@ class Test_TestProgram(unittest.TestCase):
             pass
         def testFail(self):
             raise AssertionError
-        def testError(self):
-            1/0
-        @unittest.skip('skipping')
-        def testSkipped(self):
-            raise AssertionError
-        @unittest.expectedFailure
-        def testExpectedFailure(self):
-            raise AssertionError
-        @unittest.expectedFailure
-        def testUnexpectedSuccess(self):
-            pass
 
     class FooBarLoader(unittest.TestLoader):
         """Test loader that returns a suite containing FooBar."""
@@ -122,13 +111,9 @@ class Test_TestProgram(unittest.TestCase):
                                 testRunner=unittest.TextTestRunner(stream=stream),
                                 testLoader=self.FooBarLoader())
         self.assertTrue(hasattr(program, 'result'))
-        out = stream.getvalue()
-        self.assertIn('\nFAIL: testFail ', out)
-        self.assertIn('\nERROR: testError ', out)
-        self.assertIn('\nUNEXPECTED SUCCESS: testUnexpectedSuccess ', out)
-        expected = ('\n\nFAILED (failures=1, errors=1, skipped=1, '
-                    'expected failures=1, unexpected successes=1)\n')
-        self.assertTrue(out.endswith(expected))
+        self.assertIn('\nFAIL: testFail ', stream.getvalue())
+        self.assertTrue(stream.getvalue().endswith('\n\nFAILED (failures=1)\n'))
+
 
     def test_Exit(self):
         stream = BufferedWriter()
@@ -139,13 +124,9 @@ class Test_TestProgram(unittest.TestCase):
             testRunner=unittest.TextTestRunner(stream=stream),
             exit=True,
             testLoader=self.FooBarLoader())
-        out = stream.getvalue()
-        self.assertIn('\nFAIL: testFail ', out)
-        self.assertIn('\nERROR: testError ', out)
-        self.assertIn('\nUNEXPECTED SUCCESS: testUnexpectedSuccess ', out)
-        expected = ('\n\nFAILED (failures=1, errors=1, skipped=1, '
-                    'expected failures=1, unexpected successes=1)\n')
-        self.assertTrue(out.endswith(expected))
+        self.assertIn('\nFAIL: testFail ', stream.getvalue())
+        self.assertTrue(stream.getvalue().endswith('\n\nFAILED (failures=1)\n'))
+
 
     def test_ExitAsDefault(self):
         stream = BufferedWriter()
@@ -155,13 +136,8 @@ class Test_TestProgram(unittest.TestCase):
             argv=["foobar"],
             testRunner=unittest.TextTestRunner(stream=stream),
             testLoader=self.FooBarLoader())
-        out = stream.getvalue()
-        self.assertIn('\nFAIL: testFail ', out)
-        self.assertIn('\nERROR: testError ', out)
-        self.assertIn('\nUNEXPECTED SUCCESS: testUnexpectedSuccess ', out)
-        expected = ('\n\nFAILED (failures=1, errors=1, skipped=1, '
-                    'expected failures=1, unexpected successes=1)\n')
-        self.assertTrue(out.endswith(expected))
+        self.assertIn('\nFAIL: testFail ', stream.getvalue())
+        self.assertTrue(stream.getvalue().endswith('\n\nFAILED (failures=1)\n'))
 
 
 class InitialisableProgram(unittest.TestProgram):
@@ -196,7 +172,6 @@ class FakeRunner(object):
         return RESULT
 
 
-@support.requires_subprocess()
 class TestCommandLineArgs(unittest.TestCase):
 
     def setUp(self):
@@ -454,9 +429,7 @@ class TestCommandLineArgs(unittest.TestCase):
 
     def testSelectedTestNamesFunctionalTest(self):
         def run_unittest(args):
-            # Use -E to ignore PYTHONSAFEPATH env var
-            cmd = [sys.executable, '-E', '-m', 'unittest'] + args
-            p = subprocess.Popen(cmd,
+            p = subprocess.Popen([sys.executable, '-m', 'unittest'] + args,
                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, cwd=os.path.dirname(__file__))
             with p:
                 _, stderr = p.communicate()

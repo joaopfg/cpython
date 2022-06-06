@@ -23,7 +23,7 @@ _DEFAULT_LIMIT = 2 ** 16  # 64 KiB
 
 
 async def open_connection(host=None, port=None, *,
-                          limit=_DEFAULT_LIMIT, **kwds):
+                          loop=None, limit=_DEFAULT_LIMIT, **kwds):
     """A wrapper for create_connection() returning a (reader, writer) pair.
 
     The reader returned is a StreamReader instance; the writer is a
@@ -41,7 +41,12 @@ async def open_connection(host=None, port=None, *,
     StreamReaderProtocol classes, just copy the code -- there's
     really nothing special here except some convenience.)
     """
-    loop = events.get_running_loop()
+    if loop is None:
+        loop = events.get_event_loop()
+    else:
+        warnings.warn("The loop argument is deprecated since Python 3.8, "
+                      "and scheduled for removal in Python 3.10.",
+                      DeprecationWarning, stacklevel=2)
     reader = StreamReader(limit=limit, loop=loop)
     protocol = StreamReaderProtocol(reader, loop=loop)
     transport, _ = await loop.create_connection(
@@ -51,7 +56,7 @@ async def open_connection(host=None, port=None, *,
 
 
 async def start_server(client_connected_cb, host=None, port=None, *,
-                       limit=_DEFAULT_LIMIT, **kwds):
+                       loop=None, limit=_DEFAULT_LIMIT, **kwds):
     """Start a socket server, call back for each client connected.
 
     The first parameter, `client_connected_cb`, takes two parameters:
@@ -73,7 +78,12 @@ async def start_server(client_connected_cb, host=None, port=None, *,
     The return value is the same as loop.create_server(), i.e. a
     Server object which can be used to stop the service.
     """
-    loop = events.get_running_loop()
+    if loop is None:
+        loop = events.get_event_loop()
+    else:
+        warnings.warn("The loop argument is deprecated since Python 3.8, "
+                      "and scheduled for removal in Python 3.10.",
+                      DeprecationWarning, stacklevel=2)
 
     def factory():
         reader = StreamReader(limit=limit, loop=loop)
@@ -88,10 +98,14 @@ if hasattr(socket, 'AF_UNIX'):
     # UNIX Domain Sockets are supported on this platform
 
     async def open_unix_connection(path=None, *,
-                                   limit=_DEFAULT_LIMIT, **kwds):
+                                   loop=None, limit=_DEFAULT_LIMIT, **kwds):
         """Similar to `open_connection` but works with UNIX Domain Sockets."""
-        loop = events.get_running_loop()
-
+        if loop is None:
+            loop = events.get_event_loop()
+        else:
+            warnings.warn("The loop argument is deprecated since Python 3.8, "
+                          "and scheduled for removal in Python 3.10.",
+                          DeprecationWarning, stacklevel=2)
         reader = StreamReader(limit=limit, loop=loop)
         protocol = StreamReaderProtocol(reader, loop=loop)
         transport, _ = await loop.create_unix_connection(
@@ -100,9 +114,14 @@ if hasattr(socket, 'AF_UNIX'):
         return reader, writer
 
     async def start_unix_server(client_connected_cb, path=None, *,
-                                limit=_DEFAULT_LIMIT, **kwds):
+                                loop=None, limit=_DEFAULT_LIMIT, **kwds):
         """Similar to `start_server` but works with UNIX Domain Sockets."""
-        loop = events.get_running_loop()
+        if loop is None:
+            loop = events.get_event_loop()
+        else:
+            warnings.warn("The loop argument is deprecated since Python 3.8, "
+                          "and scheduled for removal in Python 3.10.",
+                          DeprecationWarning, stacklevel=2)
 
         def factory():
             reader = StreamReader(limit=limit, loop=loop)
@@ -125,7 +144,7 @@ class FlowControlMixin(protocols.Protocol):
 
     def __init__(self, loop=None):
         if loop is None:
-            self._loop = events._get_event_loop(stacklevel=4)
+            self._loop = events.get_event_loop()
         else:
             self._loop = loop
         self._paused = False
@@ -217,13 +236,6 @@ class StreamReaderProtocol(FlowControlMixin, protocols.Protocol):
             return None
         return self._stream_reader_wr()
 
-    def _replace_writer(self, writer):
-        loop = self._loop
-        transport = writer.transport
-        self._stream_writer = writer
-        self._transport = transport
-        self._over_ssl = transport.get_extra_info('sslcontext') is not None
-
     def connection_made(self, transport):
         if self._reject_connection:
             context = {
@@ -290,13 +302,9 @@ class StreamReaderProtocol(FlowControlMixin, protocols.Protocol):
     def __del__(self):
         # Prevent reports about unhandled exceptions.
         # Better than self._closed._log_traceback = False hack
-        try:
-            closed = self._closed
-        except AttributeError:
-            pass  # failed constructor
-        else:
-            if closed.done() and not closed.cancelled():
-                closed.exception()
+        closed = self._closed
+        if closed.done() and not closed.cancelled():
+            closed.exception()
 
 
 class StreamWriter:
@@ -378,20 +386,6 @@ class StreamWriter:
             await sleep(0)
         await self._protocol._drain_helper()
 
-    async def start_tls(self, sslcontext, *,
-                        server_hostname=None,
-                        ssl_handshake_timeout=None):
-        """Upgrade an existing stream-based connection to TLS."""
-        server_side = self._protocol._client_connected_cb is not None
-        protocol = self._protocol
-        await self.drain()
-        new_transport = await self._loop.start_tls(  # type: ignore
-            self._transport, protocol, sslcontext,
-            server_side=server_side, server_hostname=server_hostname,
-            ssl_handshake_timeout=ssl_handshake_timeout)
-        self._transport = new_transport
-        protocol._replace_writer(self)
-
 
 class StreamReader:
 
@@ -406,7 +400,7 @@ class StreamReader:
 
         self._limit = limit
         if loop is None:
-            self._loop = events._get_event_loop()
+            self._loop = events.get_event_loop()
         else:
             self._loop = loop
         self._buffer = bytearray()

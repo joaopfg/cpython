@@ -11,9 +11,8 @@ import textwrap
 import tempfile
 import unittest
 import argparse
-import warnings
 
-from test.support import os_helper
+from test import support
 from unittest import mock
 
 
@@ -41,8 +40,9 @@ class TestCase(unittest.TestCase):
         # The tests assume that line wrapping occurs at 80 columns, but this
         # behaviour can be overridden by setting the COLUMNS environment
         # variable.  To ensure that this width is used, set COLUMNS to 80.
-        env = self.enterContext(os_helper.EnvironmentVarGuard())
+        env = support.EnvironmentVarGuard()
         env['COLUMNS'] = '80'
+        self.addCleanup(env.__exit__)
 
 
 class TempDirMixin(object):
@@ -61,7 +61,7 @@ class TempDirMixin(object):
 
     def create_writable_file(self, filename):
         file_path = os.path.join(self.temp_dir, filename)
-        with open(file_path, 'w', encoding="utf-8") as file:
+        with open(file_path, 'w') as file:
             file.write(filename)
         return file_path
 
@@ -766,25 +766,6 @@ class TestOptionalsActionAppendWithDefault(ParserTestCase):
         ('', NS(baz=['X'])),
         ('--baz a', NS(baz=['X', 'a'])),
         ('--baz a --baz b', NS(baz=['X', 'a', 'b'])),
-    ]
-
-
-class TestConstActionsMissingConstKwarg(ParserTestCase):
-    """Tests that const gets default value of None when not provided"""
-
-    argument_signatures = [
-        Sig('-f', action='append_const'),
-        Sig('--foo', action='append_const'),
-        Sig('-b', action='store_const'),
-        Sig('--bar', action='store_const')
-    ]
-    failures = ['-f v', '--foo=bar', '--foo bar']
-    successes = [
-        ('', NS(f=None, foo=None, b=None, bar=None)),
-        ('-f', NS(f=[None], foo=None, b=None, bar=None)),
-        ('--foo', NS(f=None, foo=[None], b=None, bar=None)),
-        ('-b', NS(f=None, foo=None, b=None, bar=None)),
-        ('--bar', NS(f=None, foo=None, b=None, bar=None)),
     ]
 
 
@@ -1511,7 +1492,7 @@ class TestArgumentsFromFile(TempDirMixin, ParserTestCase):
             ('invalid', '@no-such-path\n'),
         ]
         for path, text in file_texts:
-            with open(path, 'w', encoding="utf-8") as file:
+            with open(path, 'w') as file:
                 file.write(text)
 
     parser_signature = Sig(fromfile_prefix_chars='@')
@@ -1541,7 +1522,7 @@ class TestArgumentsFromFileConverter(TempDirMixin, ParserTestCase):
             ('hello', 'hello world!\n'),
         ]
         for path, text in file_texts:
-            with open(path, 'w', encoding="utf-8") as file:
+            with open(path, 'w') as file:
                 file.write(text)
 
     class FromFileConverterArgumentParser(ErrorRaisingArgumentParser):
@@ -1647,8 +1628,7 @@ class TestFileTypeR(TempDirMixin, ParserTestCase):
     def setUp(self):
         super(TestFileTypeR, self).setUp()
         for file_name in ['foo', 'bar']:
-            with open(os.path.join(self.temp_dir, file_name),
-                      'w', encoding="utf-8") as file:
+            with open(os.path.join(self.temp_dir, file_name), 'w') as file:
                 file.write(file_name)
         self.create_readonly_file('readonly')
 
@@ -1669,7 +1649,7 @@ class TestFileTypeDefaults(TempDirMixin, ParserTestCase):
     """Test that a file is not created unless the default is needed"""
     def setUp(self):
         super(TestFileTypeDefaults, self).setUp()
-        file = open(os.path.join(self.temp_dir, 'good'), 'w', encoding="utf-8")
+        file = open(os.path.join(self.temp_dir, 'good'), 'w')
         file.write('good')
         file.close()
 
@@ -1688,8 +1668,7 @@ class TestFileTypeRB(TempDirMixin, ParserTestCase):
     def setUp(self):
         super(TestFileTypeRB, self).setUp()
         for file_name in ['foo', 'bar']:
-            with open(os.path.join(self.temp_dir, file_name),
-                      'w', encoding="utf-8") as file:
+            with open(os.path.join(self.temp_dir, file_name), 'w') as file:
                 file.write(file_name)
 
     argument_signatures = [
@@ -2209,7 +2188,7 @@ class TestAddSubparsers(TestCase):
               bar         bar help
               {1,2,3}     command help
 
-            options:
+            optional arguments:
               -h, --help  show this help message and exit
               --foo       foo help
             '''))
@@ -2228,7 +2207,7 @@ class TestAddSubparsers(TestCase):
               bar         bar help
               {1,2,3}     command help
 
-            options:
+            optional arguments:
               -h, --help  show this help message and exit
               ++foo       foo help
             '''))
@@ -2245,7 +2224,7 @@ class TestAddSubparsers(TestCase):
 
             main description
 
-            options:
+            optional arguments:
               -h, --help      show this help message and exit
               --non-breaking  help message containing non-breaking spaces shall not
                               wrap\N{NO-BREAK SPACE}at non-breaking spaces
@@ -2264,8 +2243,10 @@ class TestAddSubparsers(TestCase):
             main description
 
             positional arguments:
-              foo         \n
-            options:
+              foo         \
+
+
+            optional arguments:
               -h, --help  show this help message and exit
         '''))
 
@@ -2280,8 +2261,10 @@ class TestAddSubparsers(TestCase):
             main description
 
             positional arguments:
-              {}          \n
-            options:
+              {}          \
+
+
+            optional arguments:
               -h, --help  show this help message and exit
         '''))
 
@@ -2298,7 +2281,7 @@ class TestAddSubparsers(TestCase):
               bar         bar help
               {1,2,3}     command help
 
-            options:
+            optional arguments:
               +h, ++help  show this help message and exit
               ++foo       foo help
             '''))
@@ -2319,7 +2302,7 @@ class TestAddSubparsers(TestCase):
                 2         2 help
                 3         3 help
 
-            options:
+            optional arguments:
               -h, --help  show this help message and exit
               --foo       foo help
             '''))
@@ -2344,7 +2327,7 @@ class TestAddSubparsers(TestCase):
             positional arguments:
               bar         bar help
 
-            options:
+            optional arguments:
               -h, --help  show this help message and exit
               --foo       foo help
 
@@ -2368,7 +2351,7 @@ class TestAddSubparsers(TestCase):
             positional arguments:
               {a,b,c}     x help
 
-            options:
+            optional arguments:
               -h, --help  show this help message and exit
               -w W        w help
             '''))
@@ -2382,7 +2365,7 @@ class TestAddSubparsers(TestCase):
             positional arguments:
               z           z help
 
-            options:
+            optional arguments:
               -h, --help  show this help message and exit
               -y {1,2,3}  y help
             '''))
@@ -2414,7 +2397,7 @@ class TestAddSubparsers(TestCase):
             positional arguments:
               bar                   bar help
 
-            options:
+            optional arguments:
               -h, --help            show this help message and exit
               --foo                 foo help
 
@@ -2602,7 +2585,7 @@ class TestParentParsers(TestCase):
               a
               z
 
-            options:
+            optional arguments:
               -h, --help  show this help message and exit
               -b B
               --w W
@@ -2632,7 +2615,7 @@ class TestParentParsers(TestCase):
         self.assertEqual(parser_help, textwrap.dedent('''\
             usage: {}{}[-h] [-w W] [-x X] [-y Y | -z Z]
 
-            options:
+            optional arguments:
               -h, --help  show this help message and exit
               -y Y
               -z Z
@@ -2677,7 +2660,7 @@ class TestMutuallyExclusiveGroupErrors(TestCase):
         expected = '''\
             usage: PROG [-h] [--foo | --bar] [--soup | --nuts]
 
-            options:
+            optional arguments:
               -h, --help  show this help message and exit
               --foo
               --bar
@@ -2769,7 +2752,7 @@ class TestMutuallyExclusiveSimple(MEMixin, TestCase):
         '''
     help = '''\
 
-        options:
+        optional arguments:
           -h, --help   show this help message and exit
           --bar BAR    bar help
           --baz [BAZ]  baz help
@@ -2810,7 +2793,7 @@ class TestMutuallyExclusiveLong(MEMixin, TestCase):
     '''
     help = '''\
 
-    options:
+    optional arguments:
       -h, --help     show this help message and exit
       --abcde ABCDE  abcde help
       --fghij FGHIJ  fghij help
@@ -2846,7 +2829,7 @@ class TestMutuallyExclusiveFirstSuppressed(MEMixin, TestCase):
         '''
     help = '''\
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           -y          y help
         '''
@@ -2883,7 +2866,7 @@ class TestMutuallyExclusiveManySuppressed(MEMixin, TestCase):
         '''
     help = '''\
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
         '''
 
@@ -2926,7 +2909,7 @@ class TestMutuallyExclusiveOptionalAndPositional(MEMixin, TestCase):
         positional arguments:
           badger       BADGER
 
-        options:
+        optional arguments:
           -h, --help   show this help message and exit
           --foo        FOO
           --spam SPAM  SPAM
@@ -2965,7 +2948,7 @@ class TestMutuallyExclusiveOptionalsMixed(MEMixin, TestCase):
         '''
     help = '''\
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           -x          x help
           -a          a help
@@ -3004,7 +2987,7 @@ class TestMutuallyExclusiveInGroup(MEMixin, TestCase):
         '''
     help = '''\
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
 
         Titled group:
@@ -3049,7 +3032,7 @@ class TestMutuallyExclusiveOptionalsAndPositionalsMixed(MEMixin, TestCase):
           x           x help
           a           a help
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           -y          y help
           -b          b help
@@ -3058,24 +3041,15 @@ class TestMutuallyExclusiveOptionalsAndPositionalsMixed(MEMixin, TestCase):
 
 class TestMutuallyExclusiveNested(MEMixin, TestCase):
 
-    # Nesting mutually exclusive groups is an undocumented feature
-    # that came about by accident through inheritance and has been
-    # the source of many bugs. It is deprecated and this test should
-    # eventually be removed along with it.
-
     def get_parser(self, required):
         parser = ErrorRaisingArgumentParser(prog='PROG')
         group = parser.add_mutually_exclusive_group(required=required)
         group.add_argument('-a')
         group.add_argument('-b')
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore', DeprecationWarning)
-            group2 = group.add_mutually_exclusive_group(required=required)
+        group2 = group.add_mutually_exclusive_group(required=required)
         group2.add_argument('-c')
         group2.add_argument('-d')
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore', DeprecationWarning)
-            group3 = group2.add_mutually_exclusive_group(required=required)
+        group3 = group2.add_mutually_exclusive_group(required=required)
         group3.add_argument('-e')
         group3.add_argument('-f')
         return parser
@@ -3089,7 +3063,7 @@ class TestMutuallyExclusiveNested(MEMixin, TestCase):
 
     help = '''\
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           -a A
           -b B
@@ -3347,7 +3321,6 @@ class TestHelpFormattingMetaclass(type):
             def _test(self, tester, parser_text):
                 expected_text = getattr(tester, self.func_suffix)
                 expected_text = textwrap.dedent(expected_text)
-                tester.maxDiff = None
                 tester.assertEqual(expected_text, parser_text)
 
             def test_format(self, tester):
@@ -3408,7 +3381,7 @@ class TestHelpBiggerOptionals(HelpTestCase):
           foo            FOO HELP
           bar            BAR HELP
 
-        options:
+        optional arguments:
           -h, --help     show this help message and exit
           -v, --version  show program's version number and exit
           -x             X HELP
@@ -3427,8 +3400,9 @@ class TestShortColumns(HelpTestCase):
     but we don't want any exceptions thrown in such cases. Only ugly representation.
     '''
     def setUp(self):
-        env = self.enterContext(os_helper.EnvironmentVarGuard())
+        env = support.EnvironmentVarGuard()
         env.set("COLUMNS", '15')
+        self.addCleanup(env.__exit__)
 
     parser_signature            = TestHelpBiggerOptionals.parser_signature
     argument_signatures         = TestHelpBiggerOptionals.argument_signatures
@@ -3452,7 +3426,7 @@ class TestShortColumns(HelpTestCase):
           bar
             BAR HELP
 
-        options:
+        optional arguments:
           -h, --help
             show this
             help
@@ -3502,7 +3476,7 @@ class TestHelpBiggerOptionalGroups(HelpTestCase):
           foo            FOO HELP
           bar            BAR HELP
 
-        options:
+        optional arguments:
           -h, --help     show this help message and exit
           -v, --version  show program's version number and exit
           -x             X HELP
@@ -3543,7 +3517,7 @@ class TestHelpBiggerPositionals(HelpTestCase):
           ekiekiekifekang  EKI HELP
           bar              BAR HELP
 
-        options:
+        optional arguments:
           -h, --help       show this help message and exit
           -x               X HELP
           --y Y            Y HELP
@@ -3590,7 +3564,7 @@ multiple
         positional arguments:
           yyy         normal y help
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           -x XX       oddly formatted -x help
 
@@ -3630,7 +3604,7 @@ DD DD DD
 YHYH YHYH
                       YHYH YHYH YHYH YHYH YHYH YHYH YHYH YH
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           -x XX       XHH HXXHH HXXHH HXXHH HXXHH HXXHH HXXHH HXXHH HXXHH \
 HXXHH HXXHH
@@ -3673,7 +3647,7 @@ DD DD DD
 YHYH YHYH
                                 YHYH YHYH YHYH YHYH YHYH YHYH YHYH YHYH YHYH YH
 
-        options:
+        optional arguments:
           -h, --help            show this help message and exit
           -v, --version         show program's version number and exit
           -x XXXXXXXXXXXXXXXXXXXXXXXXX
@@ -3737,12 +3711,12 @@ class TestHelpUsage(HelpTestCase):
           b                     b
           c                     c
 
-        options:
+        optional arguments:
           -h, --help            show this help message and exit
           -w W [W ...]          w
           -x [X ...]            x
           --foo, --no-foo       Whether to foo
-          --bar, --no-bar       Whether to bar
+          --bar, --no-bar       Whether to bar (default: True)
           -f, --foobar, --no-foobar, --barfoo, --no-barfoo
           --bazz, --no-bazz     Bazz!
 
@@ -3807,7 +3781,7 @@ class TestHelpUsageLongProg(HelpTestCase):
           a
           b
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           -w W
           -x X
@@ -3841,7 +3815,7 @@ class TestHelpUsageLongProgOptionsWrap(HelpTestCase):
           a
           b
 
-        options:
+        optional arguments:
           -h, --help            show this help message and exit
           -w WWWWWWWWWWWWWWWWWWWWWWWWW
           -x XXXXXXXXXXXXXXXXXXXXXXXXX
@@ -3904,7 +3878,7 @@ class TestHelpUsageOptionalsWrap(HelpTestCase):
           b
           c
 
-        options:
+        optional arguments:
           -h, --help            show this help message and exit
           -w WWWWWWWWWWWWWWWWWWWWWWWWW
           -x XXXXXXXXXXXXXXXXXXXXXXXXX
@@ -3939,7 +3913,7 @@ class TestHelpUsagePositionalsWrap(HelpTestCase):
           bbbbbbbbbbbbbbbbbbbbbbbbb
           ccccccccccccccccccccccccc
 
-        options:
+        optional arguments:
           -h, --help            show this help message and exit
           -x X
           -y Y
@@ -3975,7 +3949,7 @@ class TestHelpUsageOptionalsPositionalsWrap(HelpTestCase):
           bbbbbbbbbbbbbbbbbbbbbbbbb
           ccccccccccccccccccccccccc
 
-        options:
+        optional arguments:
           -h, --help            show this help message and exit
           -x XXXXXXXXXXXXXXXXXXXXXXXXX
           -y YYYYYYYYYYYYYYYYYYYYYYYYY
@@ -4001,7 +3975,7 @@ class TestHelpUsageOptionalsOnlyWrap(HelpTestCase):
         '''
     help = usage + '''\
 
-        options:
+        optional arguments:
           -h, --help            show this help message and exit
           -x XXXXXXXXXXXXXXXXXXXXXXXXX
           -y YYYYYYYYYYYYYYYYYYYYYYYYY
@@ -4066,7 +4040,7 @@ class TestHelpVariableExpansion(HelpTestCase):
           spam           spam PROG None
           badger         badger PROG 0.5
 
-        options:
+        optional arguments:
           -h, --help     show this help message and exit
           -x X           x PROG None int %
           -y             y PROG 42 XXX
@@ -4091,7 +4065,7 @@ class TestHelpVariableExpansionUsageSupplied(HelpTestCase):
         ''')
     help = usage + '''\
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
         '''
     version = ''
@@ -4123,7 +4097,7 @@ class TestHelpSuppressUsage(HelpTestCase):
         positional arguments:
           spam        spam help
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           --foo FOO   foo help
         '''
@@ -4170,7 +4144,7 @@ class TestHelpSuppressOptionalGroup(HelpTestCase):
         positional arguments:
           spam        spam help
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           --foo FOO   foo help
         '''
@@ -4191,7 +4165,7 @@ class TestHelpSuppressPositional(HelpTestCase):
         '''
     help = usage + '''\
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           --foo FOO   foo help
         '''
@@ -4211,7 +4185,7 @@ class TestHelpRequiredOptional(HelpTestCase):
         '''
     help = usage + '''\
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           --foo FOO   foo help
         '''
@@ -4232,7 +4206,7 @@ class TestHelpAlternatePrefixChars(HelpTestCase):
         '''
     help = usage + '''\
 
-        options:
+        optional arguments:
           ^^foo              foo help
           ;b BAR, ;;bar BAR  bar help
         '''
@@ -4256,7 +4230,7 @@ class TestHelpNoHelpOptional(HelpTestCase):
         positional arguments:
           spam       spam help
 
-        options:
+        optional arguments:
           --foo FOO  foo help
         '''
     version = ''
@@ -4279,7 +4253,7 @@ class TestHelpNone(HelpTestCase):
         positional arguments:
           spam
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           --foo FOO
         '''
@@ -4303,7 +4277,7 @@ class TestHelpTupleMetavar(HelpTestCase):
         '''
     help = usage + '''\
 
-        options:
+        optional arguments:
           -h, --help        show this help message and exit
           -w W1 [W2 ...]    w
           -x [X1 [X2 ...]]  x
@@ -4347,7 +4321,7 @@ class TestHelpRawText(HelpTestCase):
         positional arguments:
           spam        spam help
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           --foo FOO       foo help should also
                       appear as given here
@@ -4396,7 +4370,7 @@ class TestHelpRawDescription(HelpTestCase):
         positional arguments:
           spam        spam help
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           --foo FOO   foo help should not retain this odd formatting
 
@@ -4422,8 +4396,6 @@ class TestHelpArgumentDefaults(HelpTestCase):
         Sig('--bar', action='store_true', help='bar help'),
         Sig('--taz', action=argparse.BooleanOptionalAction,
             help='Whether to taz it', default=True),
-        Sig('--corge', action=argparse.BooleanOptionalAction,
-            help='Whether to corge it', default=argparse.SUPPRESS),
         Sig('--quux', help="Set the quux", default=42),
         Sig('spam', help='spam help'),
         Sig('badger', nargs='?', default='wooden', help='badger help'),
@@ -4433,8 +4405,8 @@ class TestHelpArgumentDefaults(HelpTestCase):
          [Sig('--baz', type=int, default=42, help='baz help')]),
     ]
     usage = '''\
-        usage: PROG [-h] [--foo FOO] [--bar] [--taz | --no-taz] [--corge | --no-corge]
-                    [--quux QUUX] [--baz BAZ]
+        usage: PROG [-h] [--foo FOO] [--bar] [--taz | --no-taz] [--quux QUUX]
+                    [--baz BAZ]
                     spam [badger]
         '''
     help = usage + '''\
@@ -4442,21 +4414,20 @@ class TestHelpArgumentDefaults(HelpTestCase):
         description
 
         positional arguments:
-          spam                 spam help
-          badger               badger help (default: wooden)
+          spam             spam help
+          badger           badger help (default: wooden)
 
-        options:
-          -h, --help           show this help message and exit
-          --foo FOO            foo help - oh and by the way, None
-          --bar                bar help (default: False)
-          --taz, --no-taz      Whether to taz it (default: True)
-          --corge, --no-corge  Whether to corge it
-          --quux QUUX          Set the quux (default: 42)
+        optional arguments:
+          -h, --help       show this help message and exit
+          --foo FOO        foo help - oh and by the way, None
+          --bar            bar help (default: False)
+          --taz, --no-taz  Whether to taz it (default: True)
+          --quux QUUX      Set the quux (default: 42)
 
         title:
           description
 
-          --baz BAZ            baz help (default: 42)
+          --baz BAZ        baz help (default: 42)
         '''
     version = ''
 
@@ -4473,7 +4444,7 @@ class TestHelpVersionAction(HelpTestCase):
 
         description
 
-        options:
+        optional arguments:
           -h, --help     show this help message and exit
           -V, --version  show program's version number and exit
         '''
@@ -4499,7 +4470,7 @@ class TestHelpVersionActionSuppress(HelpTestCase):
         positional arguments:
           spam        spam help
 
-        options:
+        optional arguments:
           -h, --help  show this help message and exit
           --foo FOO   foo help
         '''
@@ -4525,7 +4496,7 @@ class TestHelpSubparsersOrdering(HelpTestCase):
         positional arguments:
           {a,b,c,d,e}
 
-        options:
+        optional arguments:
           -h, --help     show this help message and exit
           -v, --version  show program's version number and exit
         '''
@@ -4566,7 +4537,7 @@ class TestHelpSubparsersWithHelpOrdering(HelpTestCase):
             d            d subcommand help
             e            e subcommand help
 
-        options:
+        optional arguments:
           -h, --help     show this help message and exit
           -v, --version  show program's version number and exit
         '''
@@ -4598,7 +4569,7 @@ class TestHelpMetavarTypeFormatter(HelpTestCase):
         positional arguments:
           int
 
-        options:
+        optional arguments:
           -h, --help      show this help message and exit
           -b custom_type
           -c SOME FLOAT
@@ -4790,7 +4761,7 @@ class TestConflictHandling(TestCase):
         self.assertEqual(parser.format_help(), textwrap.dedent('''\
             usage: PROG [-h] [-x X]
 
-            options:
+            optional arguments:
               -h, --help  show this help message and exit
               -x X        NEW X
             '''))
@@ -4800,24 +4771,11 @@ class TestConflictHandling(TestCase):
         self.assertEqual(parser.format_help(), textwrap.dedent('''\
             usage: PROG [-h] [-x X] [--spam NEW_SPAM]
 
-            options:
+            optional arguments:
               -h, --help       show this help message and exit
               -x X             NEW X
               --spam NEW_SPAM
             '''))
-
-    def test_subparser_conflict(self):
-        parser = argparse.ArgumentParser()
-        sp = parser.add_subparsers()
-        sp.add_parser('fullname', aliases=['alias'])
-        self.assertRaises(argparse.ArgumentError,
-                          sp.add_parser, 'fullname')
-        self.assertRaises(argparse.ArgumentError,
-                          sp.add_parser, 'alias')
-        self.assertRaises(argparse.ArgumentError,
-                          sp.add_parser, 'other', aliases=['fullname'])
-        self.assertRaises(argparse.ArgumentError,
-                          sp.add_parser, 'other', aliases=['alias'])
 
 
 # =============================
@@ -5546,7 +5504,7 @@ class TestWrappingMetavar(TestCase):
             usage: this_is_spammy_prog_with_a_long_name_sorry_about_the_name
                    [-h] [--proxy <http[s]://example:1234>]
 
-            options:
+            optional arguments:
               -h, --help            show this help message and exit
               --proxy <http[s]://example:1234>
             '''))

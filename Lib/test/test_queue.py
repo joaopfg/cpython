@@ -6,13 +6,11 @@ import threading
 import time
 import unittest
 import weakref
+from test import support
 from test.support import gc_collect
-from test.support import import_helper
-from test.support import threading_helper
 
-
-py_queue = import_helper.import_fresh_module('queue', blocked=['_queue'])
-c_queue = import_helper.import_fresh_module('queue', fresh=['_queue'])
+py_queue = support.import_fresh_module('queue', blocked=['_queue'])
+c_queue = support.import_fresh_module('queue', fresh=['_queue'])
 need_c_queue = unittest.skipUnless(c_queue, "No _queue module found")
 
 QUEUE_SIZE = 5
@@ -66,7 +64,7 @@ class BlockingTestMixin:
                           block_func)
             return self.result
         finally:
-            threading_helper.join_thread(thread) # make sure the thread terminates
+            support.join_thread(thread) # make sure the thread terminates
 
     # Call this instead if block_func is supposed to raise an exception.
     def do_exceptional_blocking_test(self,block_func, block_args, trigger_func,
@@ -82,12 +80,11 @@ class BlockingTestMixin:
                 self.fail("expected exception of kind %r" %
                                  expected_exception_class)
         finally:
-            threading_helper.join_thread(thread) # make sure the thread terminates
+            support.join_thread(thread) # make sure the thread terminates
             if not thread.startedEvent.is_set():
                 self.fail("trigger thread ended but event never set")
 
 
-@threading_helper.requires_working_threading()
 class BaseQueueTestMixin(BlockingTestMixin):
     def setUp(self):
         self.cum = 0
@@ -290,8 +287,6 @@ class CPriorityQueueTest(PriorityQueueTest, unittest.TestCase):
 # A Queue subclass that can provoke failure at a moment's notice :)
 class FailingQueueException(Exception): pass
 
-
-@threading_helper.requires_working_threading()
 class FailingQueueTest(BlockingTestMixin):
 
     def setUp(self):
@@ -467,7 +462,6 @@ class BaseSimpleQueueTest:
                 return
             results.append(val)
 
-    @threading_helper.requires_working_threading()
     def run_threads(self, n_threads, q, inputs, feed_func, consume_func):
         results = []
         sentinel = None
@@ -491,7 +485,7 @@ class BaseSimpleQueueTest:
                                       args=(q, results, sentinel))
                      for i in range(n_threads)]
 
-        with threading_helper.start_threads(feeders + consumers):
+        with support.start_threads(feeders + consumers):
             pass
 
         self.assertFalse(exceptions)

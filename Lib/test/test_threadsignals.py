@@ -4,7 +4,7 @@ import unittest
 import signal
 import os
 import sys
-from test.support import threading_helper
+from test import support
 import _thread as thread
 import time
 
@@ -36,11 +36,10 @@ def send_signals():
     os.kill(process_pid, signal.SIGUSR2)
     signalled_all.release()
 
-@threading_helper.requires_working_threading()
 class ThreadSignals(unittest.TestCase):
 
     def test_signals(self):
-        with threading_helper.wait_threads_exit():
+        with support.wait_threads_exit():
             # Test signal handling semantics of threads.
             # We spawn a thread, have the thread send two signals, and
             # wait for it to finish. Check that we got both signals
@@ -130,7 +129,7 @@ class ThreadSignals(unittest.TestCase):
             def other_thread():
                 rlock.acquire()
 
-            with threading_helper.wait_threads_exit():
+            with support.wait_threads_exit():
                 thread.start_new_thread(other_thread, ())
                 # Wait until we can't acquire it without blocking...
                 while rlock.acquire(blocking=False):
@@ -166,7 +165,7 @@ class ThreadSignals(unittest.TestCase):
                 time.sleep(0.5)
                 lock.release()
 
-            with threading_helper.wait_threads_exit():
+            with support.wait_threads_exit():
                 thread.start_new_thread(other_thread, ())
                 # Wait until we can't acquire it without blocking...
                 while lock.acquire(blocking=False):
@@ -213,7 +212,7 @@ class ThreadSignals(unittest.TestCase):
                     os.kill(process_pid, signal.SIGUSR1)
                 done.release()
 
-            with threading_helper.wait_threads_exit():
+            with support.wait_threads_exit():
                 # Send the signals from the non-main thread, since the main thread
                 # is the only one that can process signals.
                 thread.start_new_thread(send_signals, ())

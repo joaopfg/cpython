@@ -6,7 +6,6 @@ import random
 import time
 import unittest
 import weakref
-from test.support import threading_helper
 
 try:
     from _testcapi import hamt
@@ -342,7 +341,6 @@ class ContextTest(unittest.TestCase):
         ctx1.run(ctx1_fun)
 
     @isolated_context
-    @threading_helper.requires_working_threading()
     def test_context_threads_1(self):
         cvar = contextvars.ContextVar('cvar')
 

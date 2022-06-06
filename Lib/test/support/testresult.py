@@ -9,20 +9,20 @@ import time
 import traceback
 import unittest
 
+import xml.etree.ElementTree as ET
+
+from datetime import datetime
+
 class RegressionTestResult(unittest.TextTestResult):
-    USE_XML = False
 
     def __init__(self, stream, descriptions, verbosity):
         super().__init__(stream=stream, descriptions=descriptions,
                          verbosity=2 if verbosity else 0)
         self.buffer = True
-        if self.USE_XML:
-            from xml.etree import ElementTree as ET
-            from datetime import datetime
-            self.__ET = ET
-            self.__suite = ET.Element('testsuite')
-            self.__suite.set('start', datetime.utcnow().isoformat(' '))
-            self.__e = None
+        self.__suite = ET.Element('testsuite')
+        self.__suite.set('start', datetime.utcnow().isoformat(' '))
+
+        self.__e = None
         self.__start_time = None
 
     @classmethod
@@ -39,19 +39,14 @@ class RegressionTestResult(unittest.TextTestResult):
 
     def startTest(self, test):
         super().startTest(test)
-        if self.USE_XML:
-            self.__e = e = self.__ET.SubElement(self.__suite, 'testcase')
+        self.__e = e = ET.SubElement(self.__suite, 'testcase')
         self.__start_time = time.perf_counter()
 
     def _add_result(self, test, capture=False, **args):
-        if not self.USE_XML:
-            return
         e = self.__e
         self.__e = None
         if e is None:
             return
-        ET = self.__ET
-
         e.set('name', args.pop('name', self.__getId(test)))
         e.set('status', args.pop('status', 'run'))
         e.set('result', args.pop('result', 'completed'))
@@ -123,8 +118,6 @@ class RegressionTestResult(unittest.TextTestResult):
         super().addUnexpectedSuccess(test)
 
     def get_xml_element(self):
-        if not self.USE_XML:
-            raise ValueError("USE_XML is false")
         e = self.__suite
         e.set('tests', str(self.testsRun))
         e.set('errors', str(len(self.errors)))
@@ -152,9 +145,6 @@ def get_test_runner(stream, verbosity, capture_output=False):
     return get_test_runner_class(verbosity, capture_output)(stream)
 
 if __name__ == '__main__':
-    import xml.etree.ElementTree as ET
-    RegressionTestResult.USE_XML = True
-
     class TestTests(unittest.TestCase):
         def test_pass(self):
             pass
@@ -173,7 +163,7 @@ if __name__ == '__main__':
             raise RuntimeError('error message')
 
     suite = unittest.TestSuite()
-    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(TestTests))
+    suite.addTest(unittest.makeSuite(TestTests))
     stream = io.StringIO()
     runner_cls = get_test_runner_class(sum(a == '-v' for a in sys.argv))
     runner = runner_cls(sys.stdout)

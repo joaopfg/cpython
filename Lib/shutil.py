@@ -32,6 +32,16 @@ try:
 except ImportError:
     _LZMA_SUPPORTED = False
 
+try:
+    from pwd import getpwnam
+except ImportError:
+    getpwnam = None
+
+try:
+    from grp import getgrnam
+except ImportError:
+    getgrnam = None
+
 _WINDOWS = os.name == 'nt'
 posix = nt = None
 if os.name == 'posix':
@@ -40,8 +50,6 @@ elif _WINDOWS:
     import nt
 
 COPY_BUFSIZE = 1024 * 1024 if _WINDOWS else 64 * 1024
-# This should never be removed, see rationale in:
-# https://bugs.python.org/issue43743#msg393429
 _USE_CP_SENDFILE = hasattr(os, "sendfile") and sys.platform.startswith("linux")
 _HAS_FCOPYFILE = posix and hasattr(posix, "_fcopyfile")  # macOS
 
@@ -182,16 +190,15 @@ def _copyfileobj_readinto(fsrc, fdst, length=COPY_BUFSIZE):
                 break
             elif n < length:
                 with mv[:n] as smv:
-                    fdst_write(smv)
-                break
+                    fdst.write(smv)
             else:
                 fdst_write(mv)
 
 def copyfileobj(fsrc, fdst, length=0):
     """copy data from file-like object fsrc to file-like object fdst"""
+    # Localize variable access to minimize overhead.
     if not length:
         length = COPY_BUFSIZE
-    # Localize variable access to minimize overhead.
     fsrc_read = fsrc.read
     fdst_write = fdst.write
     while True:
@@ -687,13 +694,8 @@ _use_fd_functions = ({os.open, os.stat, os.unlink, os.rmdir} <=
                      os.scandir in os.supports_fd and
                      os.stat in os.supports_follow_symlinks)
 
-def rmtree(path, ignore_errors=False, onerror=None, *, dir_fd=None):
+def rmtree(path, ignore_errors=False, onerror=None):
     """Recursively delete a directory tree.
-
-    If dir_fd is not None, it should be a file descriptor open to a directory;
-    path will then be relative to that directory.
-    dir_fd may not be implemented on your platform.
-    If it is unavailable, using it will raise a NotImplementedError.
 
     If ignore_errors is set, errors are ignored; otherwise, if onerror
     is set, it is called to handle the error with arguments (func,
@@ -703,7 +705,7 @@ def rmtree(path, ignore_errors=False, onerror=None, *, dir_fd=None):
     is false and onerror is None, an exception is raised.
 
     """
-    sys.audit("shutil.rmtree", path, dir_fd)
+    sys.audit("shutil.rmtree", path)
     if ignore_errors:
         def onerror(*args):
             pass
@@ -717,12 +719,12 @@ def rmtree(path, ignore_errors=False, onerror=None, *, dir_fd=None):
         # Note: To guard against symlink races, we use the standard
         # lstat()/open()/fstat() trick.
         try:
-            orig_st = os.lstat(path, dir_fd=dir_fd)
+            orig_st = os.lstat(path)
         except Exception:
             onerror(os.lstat, path, sys.exc_info())
             return
         try:
-            fd = os.open(path, os.O_RDONLY, dir_fd=dir_fd)
+            fd = os.open(path, os.O_RDONLY)
             fd_closed = False
         except Exception:
             onerror(os.open, path, sys.exc_info())
@@ -733,7 +735,7 @@ def rmtree(path, ignore_errors=False, onerror=None, *, dir_fd=None):
                 try:
                     os.close(fd)
                     fd_closed = True
-                    os.rmdir(path, dir_fd=dir_fd)
+                    os.rmdir(path)
                 except OSError:
                     onerror(os.rmdir, path, sys.exc_info())
             else:
@@ -746,8 +748,6 @@ def rmtree(path, ignore_errors=False, onerror=None, *, dir_fd=None):
             if not fd_closed:
                 os.close(fd)
     else:
-        if dir_fd is not None:
-            raise NotImplementedError("dir_fd unavailable on this platform")
         try:
             if _rmtree_islink(path):
                 # symlinks to directories are forbidden, see bug #1669
@@ -862,14 +862,8 @@ def _is_immutable(src):
 
 def _get_gid(name):
     """Returns a gid, given a group name."""
-    if name is None:
+    if getgrnam is None or name is None:
         return None
-
-    try:
-        from grp import getgrnam
-    except ImportError:
-        return None
-
     try:
         result = getgrnam(name)
     except KeyError:
@@ -880,14 +874,8 @@ def _get_gid(name):
 
 def _get_uid(name):
     """Returns an uid, given a user name."""
-    if name is None:
+    if getpwnam is None or name is None:
         return None
-
-    try:
-        from pwd import getpwnam
-    except ImportError:
-        return None
-
     try:
         result = getpwnam(name)
     except KeyError:
@@ -1390,9 +1378,9 @@ def get_terminal_size(fallback=(80, 24)):
             # os.get_terminal_size() is unsupported
             size = os.terminal_size(fallback)
         if columns <= 0:
-            columns = size.columns or fallback[0]
+            columns = size.columns
         if lines <= 0:
-            lines = size.lines or fallback[1]
+            lines = size.lines
 
     return os.terminal_size((columns, lines))
 

@@ -17,13 +17,12 @@ import subprocess
 import sys
 import threading
 import time
-import types
 import errno
 import unittest
 from unittest import mock
 import weakref
 
-if sys.platform not in ('win32', 'vxworks'):
+if sys.platform != 'win32':
     import tty
 
 import asyncio
@@ -34,7 +33,6 @@ from asyncio import selector_events
 from test.test_asyncio import utils as test_utils
 from test import support
 from test.support import socket_helper
-from test.support import threading_helper
 from test.support import ALWAYS_EQ, LARGEST, SMALLEST
 
 
@@ -88,27 +86,23 @@ class MyBaseProto(asyncio.Protocol):
             self.connected = loop.create_future()
             self.done = loop.create_future()
 
-    def _assert_state(self, *expected):
-        if self.state not in expected:
-            raise AssertionError(f'state: {self.state!r}, expected: {expected!r}')
-
     def connection_made(self, transport):
         self.transport = transport
-        self._assert_state('INITIAL')
+        assert self.state == 'INITIAL', self.state
         self.state = 'CONNECTED'
         if self.connected:
             self.connected.set_result(None)
 
     def data_received(self, data):
-        self._assert_state('CONNECTED')
+        assert self.state == 'CONNECTED', self.state
         self.nbytes += len(data)
 
     def eof_received(self):
-        self._assert_state('CONNECTED')
+        assert self.state == 'CONNECTED', self.state
         self.state = 'EOF'
 
     def connection_lost(self, exc):
-        self._assert_state('CONNECTED', 'EOF')
+        assert self.state in ('CONNECTED', 'EOF'), self.state
         self.state = 'CLOSED'
         if self.done:
             self.done.set_result(None)
@@ -129,24 +123,20 @@ class MyDatagramProto(asyncio.DatagramProtocol):
         if loop is not None:
             self.done = loop.create_future()
 
-    def _assert_state(self, expected):
-        if self.state != expected:
-            raise AssertionError(f'state: {self.state!r}, expected: {expected!r}')
-
     def connection_made(self, transport):
         self.transport = transport
-        self._assert_state('INITIAL')
+        assert self.state == 'INITIAL', self.state
         self.state = 'INITIALIZED'
 
     def datagram_received(self, data, addr):
-        self._assert_state('INITIALIZED')
+        assert self.state == 'INITIALIZED', self.state
         self.nbytes += len(data)
 
     def error_received(self, exc):
-        self._assert_state('INITIALIZED')
+        assert self.state == 'INITIALIZED', self.state
 
     def connection_lost(self, exc):
-        self._assert_state('INITIALIZED')
+        assert self.state == 'INITIALIZED', self.state
         self.state = 'CLOSED'
         if self.done:
             self.done.set_result(None)
@@ -162,27 +152,23 @@ class MyReadPipeProto(asyncio.Protocol):
         if loop is not None:
             self.done = loop.create_future()
 
-    def _assert_state(self, expected):
-        if self.state != expected:
-            raise AssertionError(f'state: {self.state!r}, expected: {expected!r}')
-
     def connection_made(self, transport):
         self.transport = transport
-        self._assert_state(['INITIAL'])
+        assert self.state == ['INITIAL'], self.state
         self.state.append('CONNECTED')
 
     def data_received(self, data):
-        self._assert_state(['INITIAL', 'CONNECTED'])
+        assert self.state == ['INITIAL', 'CONNECTED'], self.state
         self.nbytes += len(data)
 
     def eof_received(self):
-        self._assert_state(['INITIAL', 'CONNECTED'])
+        assert self.state == ['INITIAL', 'CONNECTED'], self.state
         self.state.append('EOF')
 
     def connection_lost(self, exc):
         if 'EOF' not in self.state:
             self.state.append('EOF')  # It is okay if EOF is missed.
-        self._assert_state(['INITIAL', 'CONNECTED', 'EOF'])
+        assert self.state == ['INITIAL', 'CONNECTED', 'EOF'], self.state
         self.state.append('CLOSED')
         if self.done:
             self.done.set_result(None)
@@ -197,17 +183,13 @@ class MyWritePipeProto(asyncio.BaseProtocol):
         if loop is not None:
             self.done = loop.create_future()
 
-    def _assert_state(self, expected):
-        if self.state != expected:
-            raise AssertionError(f'state: {self.state!r}, expected: {expected!r}')
-
     def connection_made(self, transport):
         self.transport = transport
-        self._assert_state('INITIAL')
+        assert self.state == 'INITIAL', self.state
         self.state = 'CONNECTED'
 
     def connection_lost(self, exc):
-        self._assert_state('CONNECTED')
+        assert self.state == 'CONNECTED', self.state
         self.state = 'CLOSED'
         if self.done:
             self.done.set_result(None)
@@ -226,35 +208,31 @@ class MySubprocessProtocol(asyncio.SubprocessProtocol):
         self.got_data = {1: asyncio.Event(),
                          2: asyncio.Event()}
 
-    def _assert_state(self, expected):
-        if self.state != expected:
-            raise AssertionError(f'state: {self.state!r}, expected: {expected!r}')
-
     def connection_made(self, transport):
         self.transport = transport
-        self._assert_state('INITIAL')
+        assert self.state == 'INITIAL', self.state
         self.state = 'CONNECTED'
         self.connected.set_result(None)
 
     def connection_lost(self, exc):
-        self._assert_state('CONNECTED')
+        assert self.state == 'CONNECTED', self.state
         self.state = 'CLOSED'
         self.completed.set_result(None)
 
     def pipe_data_received(self, fd, data):
-        self._assert_state('CONNECTED')
+        assert self.state == 'CONNECTED', self.state
         self.data[fd] += data
         self.got_data[fd].set()
 
     def pipe_connection_lost(self, fd, exc):
-        self._assert_state('CONNECTED')
+        assert self.state == 'CONNECTED', self.state
         if exc:
             self.disconnects[fd].set_exception(exc)
         else:
             self.disconnects[fd].set_result(exc)
 
     def process_exited(self):
-        self._assert_state('CONNECTED')
+        assert self.state == 'CONNECTED', self.state
         self.returncode = self.transport.get_returncode()
 
 
@@ -486,8 +464,6 @@ class EventLoopTestsMixin:
         self.assertFalse(self.loop.remove_signal_handler(signal.SIGINT))
 
     @unittest.skipUnless(hasattr(signal, 'SIGALRM'), 'No SIGALRM')
-    @unittest.skipUnless(hasattr(signal, 'setitimer'),
-                         'need signal.setitimer()')
     def test_signal_handling_while_selecting(self):
         # Test with a signal actually arriving during a select() call.
         caught = 0
@@ -505,8 +481,6 @@ class EventLoopTestsMixin:
         self.assertEqual(caught, 1)
 
     @unittest.skipUnless(hasattr(signal, 'SIGALRM'), 'No SIGALRM')
-    @unittest.skipUnless(hasattr(signal, 'setitimer'),
-                         'need signal.setitimer()')
     def test_signal_handling_args(self):
         some_args = (42,)
         caught = 0
@@ -729,7 +703,7 @@ class EventLoopTestsMixin:
         proto.transport.close()
         lsock.close()
 
-        threading_helper.join_thread(thread)
+        support.join_thread(thread)
         self.assertFalse(thread.is_alive())
         self.assertEqual(proto.state, 'CLOSED')
         self.assertEqual(proto.nbytes, len(message))
@@ -737,6 +711,14 @@ class EventLoopTestsMixin:
 
     @unittest.skipIf(ssl is None, 'No ssl module')
     def test_ssl_connect_accepted_socket(self):
+        if (sys.platform == 'win32' and
+            sys.version_info < (3, 5) and
+            isinstance(self.loop, proactor_events.BaseProactorEventLoop)
+            ):
+            raise unittest.SkipTest(
+                'SSL not supported with proactor event loops before Python 3.5'
+                )
+
         server_context = test_utils.simple_server_sslcontext()
         client_context = test_utils.simple_client_sslcontext()
 
@@ -1296,7 +1278,7 @@ class EventLoopTestsMixin:
             else:
                 break
         else:
-            self.fail('Can not create socket.')
+            assert False, 'Can not create socket.'
 
         f = self.loop.create_datagram_endpoint(
             lambda: MyDatagramProto(loop=self.loop), sock=sock)
@@ -1362,7 +1344,7 @@ class EventLoopTestsMixin:
 
         rpipe, wpipe = os.pipe()
         rpipeobj = io.open(rpipe, 'rb', 1024)
-        wpipeobj = io.open(wpipe, 'w', 1024, encoding="utf-8")
+        wpipeobj = io.open(wpipe, 'w', 1024)
 
         async def connect():
             read_transport, _ = await loop.connect_read_pipe(
@@ -1388,7 +1370,6 @@ class EventLoopTestsMixin:
 
     @unittest.skipUnless(sys.platform != 'win32',
                          "Don't support pipes for Windows")
-    @unittest.skipUnless(hasattr(os, 'openpty'), 'need os.openpty()')
     def test_read_pty_output(self):
         proto = MyReadPipeProto(loop=self.loop)
 
@@ -1486,7 +1467,6 @@ class EventLoopTestsMixin:
 
     @unittest.skipUnless(sys.platform != 'win32',
                          "Don't support pipes for Windows")
-    @unittest.skipUnless(hasattr(os, 'openpty'), 'need os.openpty()')
     # select, poll and kqueue don't support character devices (PTY) on Mac OS X
     # older than 10.6 (Snow Leopard)
     @support.requires_mac_ver(10, 6)
@@ -1531,7 +1511,6 @@ class EventLoopTestsMixin:
 
     @unittest.skipUnless(sys.platform != 'win32',
                          "Don't support pipes for Windows")
-    @unittest.skipUnless(hasattr(os, 'openpty'), 'need os.openpty()')
     # select, poll and kqueue don't support character devices (PTY) on Mac OS X
     # older than 10.6 (Snow Leopard)
     @support.requires_mac_ver(10, 6)
@@ -1757,7 +1736,6 @@ class SubprocessTestsMixin:
         connect = self.loop.subprocess_exec(
                         functools.partial(MySubprocessProtocol, self.loop),
                         sys.executable, prog)
-
         transp, proto = self.loop.run_until_complete(connect)
         self.assertIsInstance(proto, MySubprocessProtocol)
         self.loop.run_until_complete(proto.connected)
@@ -1830,7 +1808,6 @@ class SubprocessTestsMixin:
         connect = self.loop.subprocess_shell(
                         functools.partial(MySubprocessProtocol, self.loop),
                         'exit 7', stdin=None, stdout=None, stderr=None)
-
         transp, proto = self.loop.run_until_complete(connect)
         self.assertIsInstance(proto, MySubprocessProtocol)
         self.assertIsNone(transp.get_pipe_transport(0))
@@ -1885,7 +1862,6 @@ class SubprocessTestsMixin:
                             functools.partial(MySubprocessProtocol, self.loop),
                             sys.executable, prog)
 
-
             transp, proto = self.loop.run_until_complete(connect)
             self.assertIsInstance(proto, MySubprocessProtocol)
             self.loop.run_until_complete(proto.connected)
@@ -1925,7 +1901,6 @@ class SubprocessTestsMixin:
                         functools.partial(MySubprocessProtocol, self.loop),
                         sys.executable, prog, stderr=subprocess.STDOUT)
 
-
         transp, proto = self.loop.run_until_complete(connect)
         self.assertIsInstance(proto, MySubprocessProtocol)
         self.loop.run_until_complete(proto.connected)
@@ -1949,7 +1924,6 @@ class SubprocessTestsMixin:
         connect = self.loop.subprocess_exec(
                         functools.partial(MySubprocessProtocol, self.loop),
                         sys.executable, prog)
-
         transp, proto = self.loop.run_until_complete(connect)
         self.assertIsInstance(proto, MySubprocessProtocol)
         self.loop.run_until_complete(proto.connected)
@@ -2177,7 +2151,8 @@ class HandleTests(test_utils.TestCase):
                         '<Handle cancelled>')
 
         # decorated function
-        cb = types.coroutine(noop)
+        with self.assertWarns(DeprecationWarning):
+            cb = asyncio.coroutine(noop)
         h = asyncio.Handle(cb, (), self.loop)
         self.assertEqual(repr(h),
                         '<Handle noop() at %s:%s>'
@@ -2198,15 +2173,17 @@ class HandleTests(test_utils.TestCase):
         self.assertRegex(repr(h), regex)
 
         # partial method
-        method = HandleTests.test_handle_repr
-        cb = functools.partialmethod(method)
-        filename, lineno = test_utils.get_function_source(method)
-        h = asyncio.Handle(cb, (), self.loop)
+        if sys.version_info >= (3, 4):
+            method = HandleTests.test_handle_repr
+            cb = functools.partialmethod(method)
+            filename, lineno = test_utils.get_function_source(method)
+            h = asyncio.Handle(cb, (), self.loop)
 
-        cb_regex = r'<function HandleTests.test_handle_repr .*>'
-        cb_regex = fr'functools.partialmethod\({cb_regex}, , \)\(\)'
-        regex = fr'^<Handle {cb_regex} at {re.escape(filename)}:{lineno}>$'
-        self.assertRegex(repr(h), regex)
+            cb_regex = r'<function HandleTests.test_handle_repr .*>'
+            cb_regex = (r'functools.partialmethod\(%s, , \)\(\)' % cb_regex)
+            regex = (r'^<Handle %s at %s:%s>$'
+                     % (cb_regex, re.escape(filename), lineno))
+            self.assertRegex(repr(h), regex)
 
     def test_handle_repr_debug(self):
         self.loop.get_debug.return_value = True
@@ -2332,6 +2309,10 @@ class TimerTests(unittest.TestCase):
         self.assertIsNone(h._callback)
         self.assertIsNone(h._args)
 
+        # when cannot be None
+        self.assertRaises(AssertionError,
+                          asyncio.TimerHandle, None, callback, args,
+                          self.loop)
 
     def test_timer_repr(self):
         self.loop.get_debug.return_value = False
@@ -2598,7 +2579,7 @@ class PolicyTests(unittest.TestCase):
         policy = asyncio.DefaultEventLoopPolicy()
         old_loop = policy.get_event_loop()
 
-        self.assertRaises(TypeError, policy.set_event_loop, object())
+        self.assertRaises(AssertionError, policy.set_event_loop, object())
 
         loop = policy.new_event_loop()
         policy.set_event_loop(loop)
@@ -2614,7 +2595,7 @@ class PolicyTests(unittest.TestCase):
 
     def test_set_event_loop_policy(self):
         self.assertRaises(
-            TypeError, asyncio.set_event_loop_policy, object())
+            AssertionError, asyncio.set_event_loop_policy, object())
 
         old_policy = asyncio.get_event_loop_policy()
 
@@ -2709,18 +2690,14 @@ class GetEventLoopTestsMixin:
             asyncio.set_event_loop_policy(Policy())
             loop = asyncio.new_event_loop()
 
-            with self.assertWarns(DeprecationWarning) as cm:
-                with self.assertRaises(TestError):
-                    asyncio.get_event_loop()
-            self.assertEqual(cm.filename, __file__)
+            with self.assertRaises(TestError):
+                asyncio.get_event_loop()
             asyncio.set_event_loop(None)
-            with self.assertWarns(DeprecationWarning) as cm:
-                with self.assertRaises(TestError):
-                    asyncio.get_event_loop()
-            self.assertEqual(cm.filename, __file__)
+            with self.assertRaises(TestError):
+                asyncio.get_event_loop()
 
             with self.assertRaisesRegex(RuntimeError, 'no running'):
-                asyncio.get_running_loop()
+                self.assertIs(asyncio.get_running_loop(), None)
             self.assertIs(asyncio._get_running_loop(), None)
 
             async def func():
@@ -2731,16 +2708,12 @@ class GetEventLoopTestsMixin:
             loop.run_until_complete(func())
 
             asyncio.set_event_loop(loop)
-            with self.assertWarns(DeprecationWarning) as cm:
-                with self.assertRaises(TestError):
-                    asyncio.get_event_loop()
-            self.assertEqual(cm.filename, __file__)
+            with self.assertRaises(TestError):
+                asyncio.get_event_loop()
 
             asyncio.set_event_loop(None)
-            with self.assertWarns(DeprecationWarning) as cm:
-                with self.assertRaises(TestError):
-                    asyncio.get_event_loop()
-            self.assertEqual(cm.filename, __file__)
+            with self.assertRaises(TestError):
+                asyncio.get_event_loop()
 
         finally:
             asyncio.set_event_loop_policy(old_policy)
@@ -2748,56 +2721,7 @@ class GetEventLoopTestsMixin:
                 loop.close()
 
         with self.assertRaisesRegex(RuntimeError, 'no running'):
-            asyncio.get_running_loop()
-
-        self.assertIs(asyncio._get_running_loop(), None)
-
-    def test_get_event_loop_returns_running_loop2(self):
-        old_policy = asyncio.get_event_loop_policy()
-        try:
-            asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
-            loop = asyncio.new_event_loop()
-            self.addCleanup(loop.close)
-
-            with self.assertWarns(DeprecationWarning) as cm:
-                loop2 = asyncio.get_event_loop()
-            self.addCleanup(loop2.close)
-            self.assertEqual(cm.filename, __file__)
-            asyncio.set_event_loop(None)
-            with self.assertWarns(DeprecationWarning) as cm:
-                with self.assertRaisesRegex(RuntimeError, 'no current'):
-                    asyncio.get_event_loop()
-            self.assertEqual(cm.filename, __file__)
-
-            with self.assertRaisesRegex(RuntimeError, 'no running'):
-                asyncio.get_running_loop()
-            self.assertIs(asyncio._get_running_loop(), None)
-
-            async def func():
-                self.assertIs(asyncio.get_event_loop(), loop)
-                self.assertIs(asyncio.get_running_loop(), loop)
-                self.assertIs(asyncio._get_running_loop(), loop)
-
-            loop.run_until_complete(func())
-
-            asyncio.set_event_loop(loop)
-            with self.assertWarns(DeprecationWarning) as cm:
-                self.assertIs(asyncio.get_event_loop(), loop)
-            self.assertEqual(cm.filename, __file__)
-
-            asyncio.set_event_loop(None)
-            with self.assertWarns(DeprecationWarning) as cm:
-                with self.assertRaisesRegex(RuntimeError, 'no current'):
-                    asyncio.get_event_loop()
-            self.assertEqual(cm.filename, __file__)
-
-        finally:
-            asyncio.set_event_loop_policy(old_policy)
-            if loop is not None:
-                loop.close()
-
-        with self.assertRaisesRegex(RuntimeError, 'no running'):
-            asyncio.get_running_loop()
+            self.assertIs(asyncio.get_running_loop(), None)
 
         self.assertIs(asyncio._get_running_loop(), None)
 

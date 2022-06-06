@@ -5,17 +5,12 @@ import signal
 import sys
 import unittest
 from test import support
-from test.support.os_helper import TESTFN_UNDECODABLE, FS_NONASCII
 try:
     import gc
 except ImportError:
     gc = None
 
-from test.libregrtest.utils import (setup_unraisable_hook,
-                                    setup_threading_excepthook)
-
-
-UNICODE_GUARD_ENV = "PYTHONREGRTEST_UNICODE_GUARD"
+from test.libregrtest.utils import setup_unraisable_hook
 
 
 def setup_tests(ns):
@@ -86,7 +81,6 @@ def setup_tests(ns):
         sys.addaudithook(_test_audit_hook)
 
     setup_unraisable_hook()
-    setup_threading_excepthook()
 
     if ns.timeout is not None:
         # For a slow buildbot worker, increase SHORT_TIMEOUT and LONG_TIMEOUT
@@ -98,17 +92,6 @@ def setup_tests(ns):
         support.INTERNET_TIMEOUT = min(support.INTERNET_TIMEOUT, ns.timeout)
         support.SHORT_TIMEOUT = min(support.SHORT_TIMEOUT, ns.timeout)
         support.LONG_TIMEOUT = min(support.LONG_TIMEOUT, ns.timeout)
-
-    if ns.xmlpath:
-        from test.support.testresult import RegressionTestResult
-        RegressionTestResult.USE_XML = True
-
-    # Ensure there's a non-ASCII character in env vars at all times to force
-    # tests consider this case. See BPO-44647 for details.
-    if TESTFN_UNDECODABLE and os.supports_bytes_environ:
-        os.environb.setdefault(UNICODE_GUARD_ENV.encode(), TESTFN_UNDECODABLE)
-    elif FS_NONASCII:
-        os.environ.setdefault(UNICODE_GUARD_ENV, FS_NONASCII)
 
 
 def replace_stdout():

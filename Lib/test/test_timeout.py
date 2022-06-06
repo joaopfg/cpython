@@ -5,6 +5,9 @@ import unittest
 from test import support
 from test.support import socket_helper
 
+# This requires the 'network' resource as given on the regrtest command line.
+skip_expected = not support.is_resource_enabled('network')
+
 import time
 import errno
 import socket
@@ -50,10 +53,10 @@ class CreationTestCase(unittest.TestCase):
     def testReturnType(self):
         # Test return type of gettimeout()
         self.sock.settimeout(1)
-        self.assertIs(type(self.sock.gettimeout()), float)
+        self.assertEqual(type(self.sock.gettimeout()), type(1.0))
 
         self.sock.settimeout(3.9)
-        self.assertIs(type(self.sock.gettimeout()), float)
+        self.assertEqual(type(self.sock.gettimeout()), type(1.0))
 
     def testTypeCheck(self):
         # Test type checking by settimeout()
@@ -119,7 +122,7 @@ class TimeoutTestCase(unittest.TestCase):
         """
         Test the specified socket method.
 
-        The method is run at most `count` times and must raise a TimeoutError
+        The method is run at most `count` times and must raise a socket.timeout
         within `timeout` + self.fuzz seconds.
         """
         self.sock.settimeout(timeout)
@@ -128,11 +131,11 @@ class TimeoutTestCase(unittest.TestCase):
             t1 = time.monotonic()
             try:
                 method(*args)
-            except TimeoutError as e:
+            except socket.timeout as e:
                 delta = time.monotonic() - t1
                 break
         else:
-            self.fail('TimeoutError was not raised')
+            self.fail('socket.timeout was not raised')
         # These checks should account for timing unprecision
         self.assertLess(delta, timeout + self.fuzz)
         self.assertGreater(delta, timeout - 1.0)
@@ -201,7 +204,7 @@ class TCPTimeoutTestCase(TimeoutTestCase):
         sock.settimeout(timeout)
         try:
             sock.connect((whitehole))
-        except TimeoutError:
+        except socket.timeout:
             pass
         except OSError as err:
             if err.errno == errno.ECONNREFUSED:
@@ -289,7 +292,6 @@ class UDPTimeoutTestCase(TimeoutTestCase):
 
 def setUpModule():
     support.requires('network')
-    support.requires_working_socket(module=True)
 
 
 if __name__ == "__main__":

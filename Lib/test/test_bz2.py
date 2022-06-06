@@ -13,15 +13,13 @@ import random
 import shutil
 import subprocess
 import threading
-from test.support import import_helper
-from test.support import threading_helper
-from test.support.os_helper import unlink
+from test.support import unlink
 import _compression
 import sys
 
 
 # Skip tests if the bz2 module doesn't exist.
-bz2 = import_helper.import_module('bz2')
+bz2 = support.import_module('bz2')
 from bz2 import BZ2File, BZ2Compressor, BZ2Decompressor
 
 has_cmdline_bunzip2 = None
@@ -496,7 +494,6 @@ class BZ2FileTest(BaseTest):
         else:
             self.fail("1/0 didn't raise an exception")
 
-    @threading_helper.requires_working_threading()
     def testThreading(self):
         # Issue #7205: Using a BZ2File from several threads shouldn't deadlock.
         data = b"1" * 2**20
@@ -506,7 +503,7 @@ class BZ2FileTest(BaseTest):
                 for i in range(5):
                     f.write(data)
             threads = [threading.Thread(target=comp) for i in range(nthreads)]
-            with threading_helper.start_threads(threads):
+            with support.start_threads(threads):
                 pass
 
     def testMixedIterationAndReads(self):
@@ -932,14 +929,14 @@ class OpenTest(BaseTest):
         for mode in ("wt", "xt"):
             if mode == "xt":
                 unlink(self.filename)
-            with self.open(self.filename, mode, encoding="ascii") as f:
+            with self.open(self.filename, mode) as f:
                 f.write(text)
             with open(self.filename, "rb") as f:
                 file_data = ext_decompress(f.read()).decode("ascii")
                 self.assertEqual(file_data, text_native_eol)
-            with self.open(self.filename, "rt", encoding="ascii") as f:
+            with self.open(self.filename, "rt") as f:
                 self.assertEqual(f.read(), text)
-            with self.open(self.filename, "at", encoding="ascii") as f:
+            with self.open(self.filename, "at") as f:
                 f.write(text)
             with open(self.filename, "rb") as f:
                 file_data = ext_decompress(f.read()).decode("ascii")
@@ -948,8 +945,7 @@ class OpenTest(BaseTest):
     def test_x_mode(self):
         for mode in ("x", "xb", "xt"):
             unlink(self.filename)
-            encoding = "utf-8" if "t" in mode else None
-            with self.open(self.filename, mode, encoding=encoding) as f:
+            with self.open(self.filename, mode) as f:
                 pass
             with self.assertRaises(FileExistsError):
                 with self.open(self.filename, mode) as f:
@@ -961,7 +957,7 @@ class OpenTest(BaseTest):
         with self.open(BytesIO(self.DATA), "rb") as f:
             self.assertEqual(f.read(), self.TEXT)
         text = self.TEXT.decode("ascii")
-        with self.open(BytesIO(self.DATA), "rt", encoding="utf-8") as f:
+        with self.open(BytesIO(self.DATA), "rt") as f:
             self.assertEqual(f.read(), text)
 
     def test_bad_params(self):
@@ -1000,9 +996,9 @@ class OpenTest(BaseTest):
     def test_newline(self):
         # Test with explicit newline (universal newline mode disabled).
         text = self.TEXT.decode("ascii")
-        with self.open(self.filename, "wt", encoding="utf-8", newline="\n") as f:
+        with self.open(self.filename, "wt", newline="\n") as f:
             f.write(text)
-        with self.open(self.filename, "rt", encoding="utf-8", newline="\r") as f:
+        with self.open(self.filename, "rt", newline="\r") as f:
             self.assertEqual(f.readlines(), [text])
 
 

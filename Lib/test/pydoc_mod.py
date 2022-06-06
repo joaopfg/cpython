@@ -1,7 +1,5 @@
 """This is a test module for test_pydoc"""
 
-from __future__ import print_function
-
 import types
 import typing
 
@@ -48,4 +46,3 @@ list_alias1 = typing.List[int]
 list_alias2 = list[int]
 c_alias = C[int]
 type_union1 = typing.Union[int, str]
-type_union2 = int | str

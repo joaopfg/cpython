@@ -9,9 +9,7 @@ from test.fork_wait import ForkWait
 from test import support
 
 # If either of these do not exist, skip this test.
-if not support.has_fork_support:
-    raise unittest.SkipTest("requires working os.fork()")
-
+support.get_attribute(os, 'fork')
 support.get_attribute(os, 'wait4')
 
 

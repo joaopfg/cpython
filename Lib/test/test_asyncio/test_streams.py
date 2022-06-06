@@ -40,10 +40,16 @@ class StreamTests(test_utils.TestCase):
         gc.collect()
         super().tearDown()
 
+    @mock.patch('asyncio.streams.events')
+    def test_ctor_global_loop(self, m_events):
+        stream = asyncio.StreamReader()
+        self.assertIs(stream._loop, m_events.get_event_loop.return_value)
+
     def _basetest_open_connection(self, open_connection_fut):
         messages = []
         self.loop.set_exception_handler(lambda loop, ctx: messages.append(ctx))
-        reader, writer = self.loop.run_until_complete(open_connection_fut)
+        with self.assertWarns(DeprecationWarning):
+            reader, writer = self.loop.run_until_complete(open_connection_fut)
         writer.write(b'GET / HTTP/1.0\r\n\r\n')
         f = reader.readline()
         data = self.loop.run_until_complete(f)
@@ -56,20 +62,23 @@ class StreamTests(test_utils.TestCase):
 
     def test_open_connection(self):
         with test_utils.run_test_server() as httpd:
-            conn_fut = asyncio.open_connection(*httpd.address)
+            conn_fut = asyncio.open_connection(*httpd.address,
+                                               loop=self.loop)
             self._basetest_open_connection(conn_fut)
 
     @socket_helper.skip_unless_bind_unix_socket
     def test_open_unix_connection(self):
         with test_utils.run_test_unix_server() as httpd:
-            conn_fut = asyncio.open_unix_connection(httpd.address)
+            conn_fut = asyncio.open_unix_connection(httpd.address,
+                                                    loop=self.loop)
             self._basetest_open_connection(conn_fut)
 
     def _basetest_open_connection_no_loop_ssl(self, open_connection_fut):
         messages = []
         self.loop.set_exception_handler(lambda loop, ctx: messages.append(ctx))
         try:
-            reader, writer = self.loop.run_until_complete(open_connection_fut)
+            with self.assertWarns(DeprecationWarning):
+                reader, writer = self.loop.run_until_complete(open_connection_fut)
         finally:
             asyncio.set_event_loop(None)
         writer.write(b'GET / HTTP/1.0\r\n\r\n')
@@ -85,7 +94,8 @@ class StreamTests(test_utils.TestCase):
         with test_utils.run_test_server(use_ssl=True) as httpd:
             conn_fut = asyncio.open_connection(
                 *httpd.address,
-                ssl=test_utils.dummy_ssl_context())
+                ssl=test_utils.dummy_ssl_context(),
+                loop=self.loop)
 
             self._basetest_open_connection_no_loop_ssl(conn_fut)
 
@@ -97,14 +107,15 @@ class StreamTests(test_utils.TestCase):
                 httpd.address,
                 ssl=test_utils.dummy_ssl_context(),
                 server_hostname='',
-            )
+                loop=self.loop)
 
             self._basetest_open_connection_no_loop_ssl(conn_fut)
 
     def _basetest_open_connection_error(self, open_connection_fut):
         messages = []
         self.loop.set_exception_handler(lambda loop, ctx: messages.append(ctx))
-        reader, writer = self.loop.run_until_complete(open_connection_fut)
+        with self.assertWarns(DeprecationWarning):
+            reader, writer = self.loop.run_until_complete(open_connection_fut)
         writer._protocol.connection_lost(ZeroDivisionError())
         f = reader.read()
         with self.assertRaises(ZeroDivisionError):
@@ -115,13 +126,15 @@ class StreamTests(test_utils.TestCase):
 
     def test_open_connection_error(self):
         with test_utils.run_test_server() as httpd:
-            conn_fut = asyncio.open_connection(*httpd.address)
+            conn_fut = asyncio.open_connection(*httpd.address,
+                                               loop=self.loop)
             self._basetest_open_connection_error(conn_fut)
 
     @socket_helper.skip_unless_bind_unix_socket
     def test_open_unix_connection_error(self):
         with test_utils.run_test_unix_server() as httpd:
-            conn_fut = asyncio.open_unix_connection(httpd.address)
+            conn_fut = asyncio.open_unix_connection(httpd.address,
+                                                    loop=self.loop)
             self._basetest_open_connection_error(conn_fut)
 
     def test_feed_empty_data(self):
@@ -585,7 +598,8 @@ class StreamTests(test_utils.TestCase):
                 sock = socket.create_server(('127.0.0.1', 0))
                 self.server = self.loop.run_until_complete(
                     asyncio.start_server(self.handle_client,
-                                         sock=sock))
+                                         sock=sock,
+                                         loop=self.loop))
                 return sock.getsockname()
 
             def handle_client_callback(self, client_reader, client_writer):
@@ -598,7 +612,8 @@ class StreamTests(test_utils.TestCase):
                 sock.close()
                 self.server = self.loop.run_until_complete(
                     asyncio.start_server(self.handle_client_callback,
-                                         host=addr[0], port=addr[1]))
+                                         host=addr[0], port=addr[1],
+                                         loop=self.loop))
                 return addr
 
             def stop(self):
@@ -608,7 +623,9 @@ class StreamTests(test_utils.TestCase):
                     self.server = None
 
         async def client(addr):
-            reader, writer = await asyncio.open_connection(*addr)
+            with self.assertWarns(DeprecationWarning):
+                reader, writer = await asyncio.open_connection(
+                    *addr, loop=self.loop)
             # send a line
             writer.write(b"hello world!\n")
             # read it back
@@ -622,14 +639,16 @@ class StreamTests(test_utils.TestCase):
 
         # test the server variant with a coroutine as client handler
         server = MyServer(self.loop)
-        addr = server.start()
+        with self.assertWarns(DeprecationWarning):
+            addr = server.start()
         msg = self.loop.run_until_complete(self.loop.create_task(client(addr)))
         server.stop()
         self.assertEqual(msg, b"hello world!\n")
 
         # test the server variant with a callback as client handler
         server = MyServer(self.loop)
-        addr = server.start_callback()
+        with self.assertWarns(DeprecationWarning):
+            addr = server.start_callback()
         msg = self.loop.run_until_complete(self.loop.create_task(client(addr)))
         server.stop()
         self.assertEqual(msg, b"hello world!\n")
@@ -656,7 +675,8 @@ class StreamTests(test_utils.TestCase):
             def start(self):
                 self.server = self.loop.run_until_complete(
                     asyncio.start_unix_server(self.handle_client,
-                                              path=self.path))
+                                              path=self.path,
+                                              loop=self.loop))
 
             def handle_client_callback(self, client_reader, client_writer):
                 self.loop.create_task(self.handle_client(client_reader,
@@ -664,7 +684,8 @@ class StreamTests(test_utils.TestCase):
 
             def start_callback(self):
                 start = asyncio.start_unix_server(self.handle_client_callback,
-                                                  path=self.path)
+                                                  path=self.path,
+                                                  loop=self.loop)
                 self.server = self.loop.run_until_complete(start)
 
             def stop(self):
@@ -674,7 +695,9 @@ class StreamTests(test_utils.TestCase):
                     self.server = None
 
         async def client(path):
-            reader, writer = await asyncio.open_unix_connection(path)
+            with self.assertWarns(DeprecationWarning):
+                reader, writer = await asyncio.open_unix_connection(
+                    path, loop=self.loop)
             # send a line
             writer.write(b"hello world!\n")
             # read it back
@@ -689,7 +712,8 @@ class StreamTests(test_utils.TestCase):
         # test the server variant with a coroutine as client handler
         with test_utils.unix_socket_path() as path:
             server = MyServer(self.loop, path)
-            server.start()
+            with self.assertWarns(DeprecationWarning):
+                server.start()
             msg = self.loop.run_until_complete(
                 self.loop.create_task(client(path)))
             server.stop()
@@ -698,76 +722,14 @@ class StreamTests(test_utils.TestCase):
         # test the server variant with a callback as client handler
         with test_utils.unix_socket_path() as path:
             server = MyServer(self.loop, path)
-            server.start_callback()
+            with self.assertWarns(DeprecationWarning):
+                server.start_callback()
             msg = self.loop.run_until_complete(
                 self.loop.create_task(client(path)))
             server.stop()
             self.assertEqual(msg, b"hello world!\n")
 
         self.assertEqual(messages, [])
-
-    @unittest.skipIf(ssl is None, 'No ssl module')
-    def test_start_tls(self):
-
-        class MyServer:
-
-            def __init__(self, loop):
-                self.server = None
-                self.loop = loop
-
-            async def handle_client(self, client_reader, client_writer):
-                data1 = await client_reader.readline()
-                client_writer.write(data1)
-                await client_writer.drain()
-                assert client_writer.get_extra_info('sslcontext') is None
-                await client_writer.start_tls(
-                    test_utils.simple_server_sslcontext())
-                assert client_writer.get_extra_info('sslcontext') is not None
-                data2 = await client_reader.readline()
-                client_writer.write(data2)
-                await client_writer.drain()
-                client_writer.close()
-                await client_writer.wait_closed()
-
-            def start(self):
-                sock = socket.create_server(('127.0.0.1', 0))
-                self.server = self.loop.run_until_complete(
-                    asyncio.start_server(self.handle_client,
-                                         sock=sock))
-                return sock.getsockname()
-
-            def stop(self):
-                if self.server is not None:
-                    self.server.close()
-                    self.loop.run_until_complete(self.server.wait_closed())
-                    self.server = None
-
-        async def client(addr):
-            reader, writer = await asyncio.open_connection(*addr)
-            writer.write(b"hello world 1!\n")
-            await writer.drain()
-            msgback1 = await reader.readline()
-            assert writer.get_extra_info('sslcontext') is None
-            await writer.start_tls(test_utils.simple_client_sslcontext())
-            assert writer.get_extra_info('sslcontext') is not None
-            writer.write(b"hello world 2!\n")
-            await writer.drain()
-            msgback2 = await reader.readline()
-            writer.close()
-            await writer.wait_closed()
-            return msgback1, msgback2
-
-        messages = []
-        self.loop.set_exception_handler(lambda loop, ctx: messages.append(ctx))
-
-        server = MyServer(self.loop)
-        addr = server.start()
-        msg1, msg2 = self.loop.run_until_complete(client(addr))
-        server.stop()
-
-        self.assertEqual(messages, [])
-        self.assertEqual(msg1, b"hello world 1!\n")
-        self.assertEqual(msg2, b"hello world 2!\n")
 
     @unittest.skipIf(sys.platform == 'win32', "Don't have pipes")
     def test_read_all_from_pipe_reader(self):
@@ -809,59 +771,23 @@ os.close(fd)
         data = self.loop.run_until_complete(reader.read(-1))
         self.assertEqual(data, b'data')
 
-    def test_streamreader_constructor_without_loop(self):
-        with self.assertWarns(DeprecationWarning) as cm:
-            with self.assertRaisesRegex(RuntimeError, 'There is no current event loop'):
-                asyncio.StreamReader()
-        self.assertEqual(cm.filename, __file__)
-
-    def test_streamreader_constructor_use_running_loop(self):
-        # asyncio issue #184: Ensure that StreamReaderProtocol constructor
-        # retrieves the current loop if the loop parameter is not set
-        async def test():
-            return asyncio.StreamReader()
-
-        reader = self.loop.run_until_complete(test())
-        self.assertIs(reader._loop, self.loop)
-
-    def test_streamreader_constructor_use_global_loop(self):
-        # asyncio issue #184: Ensure that StreamReaderProtocol constructor
-        # retrieves the current loop if the loop parameter is not set
-        # Deprecated in 3.10
+    def test_streamreader_constructor(self):
         self.addCleanup(asyncio.set_event_loop, None)
         asyncio.set_event_loop(self.loop)
-        with self.assertWarns(DeprecationWarning) as cm:
-            reader = asyncio.StreamReader()
-        self.assertEqual(cm.filename, __file__)
+
+        # asyncio issue #184: Ensure that StreamReaderProtocol constructor
+        # retrieves the current loop if the loop parameter is not set
+        reader = asyncio.StreamReader()
         self.assertIs(reader._loop, self.loop)
 
-
-    def test_streamreaderprotocol_constructor_without_loop(self):
-        reader = mock.Mock()
-        with self.assertWarns(DeprecationWarning) as cm:
-            with self.assertRaisesRegex(RuntimeError, 'There is no current event loop'):
-                asyncio.StreamReaderProtocol(reader)
-        self.assertEqual(cm.filename, __file__)
-
-    def test_streamreaderprotocol_constructor_use_running_loop(self):
-        # asyncio issue #184: Ensure that StreamReaderProtocol constructor
-        # retrieves the current loop if the loop parameter is not set
-        reader = mock.Mock()
-        async def test():
-            return asyncio.StreamReaderProtocol(reader)
-        protocol = self.loop.run_until_complete(test())
-        self.assertIs(protocol._loop, self.loop)
-
-    def test_streamreaderprotocol_constructor_use_global_loop(self):
-        # asyncio issue #184: Ensure that StreamReaderProtocol constructor
-        # retrieves the current loop if the loop parameter is not set
-        # Deprecated in 3.10
+    def test_streamreaderprotocol_constructor(self):
         self.addCleanup(asyncio.set_event_loop, None)
         asyncio.set_event_loop(self.loop)
+
+        # asyncio issue #184: Ensure that StreamReaderProtocol constructor
+        # retrieves the current loop if the loop parameter is not set
         reader = mock.Mock()
-        with self.assertWarns(DeprecationWarning) as cm:
-            protocol = asyncio.StreamReaderProtocol(reader)
-        self.assertEqual(cm.filename, __file__)
+        protocol = asyncio.StreamReaderProtocol(reader)
         self.assertIs(protocol._loop, self.loop)
 
     def test_drain_raises(self):
@@ -885,7 +811,9 @@ os.close(fd)
                 clt.close()
 
         async def client(host, port):
-            reader, writer = await asyncio.open_connection(host, port)
+            with self.assertWarns(DeprecationWarning):
+                reader, writer = await asyncio.open_connection(
+                    host, port, loop=self.loop)
 
             while True:
                 writer.write(b"foo\n")
@@ -893,7 +821,7 @@ os.close(fd)
 
         # Start the server thread and wait for it to be listening.
         thread = threading.Thread(target=server)
-        thread.daemon = True
+        thread.setDaemon(True)
         thread.start()
         addr = q.get()
 
@@ -969,8 +897,9 @@ os.close(fd)
 
     def test_wait_closed_on_close(self):
         with test_utils.run_test_server() as httpd:
-            rd, wr = self.loop.run_until_complete(
-                asyncio.open_connection(*httpd.address))
+            with self.assertWarns(DeprecationWarning):
+                rd, wr = self.loop.run_until_complete(
+                    asyncio.open_connection(*httpd.address, loop=self.loop))
 
             wr.write(b'GET / HTTP/1.0\r\n\r\n')
             f = rd.readline()
@@ -986,8 +915,9 @@ os.close(fd)
 
     def test_wait_closed_on_close_with_unread_data(self):
         with test_utils.run_test_server() as httpd:
-            rd, wr = self.loop.run_until_complete(
-                asyncio.open_connection(*httpd.address))
+            with self.assertWarns(DeprecationWarning):
+                rd, wr = self.loop.run_until_complete(
+                    asyncio.open_connection(*httpd.address, loop=self.loop))
 
             wr.write(b'GET / HTTP/1.0\r\n\r\n')
             f = rd.readline()
@@ -1044,16 +974,18 @@ os.close(fd)
         self.loop.set_exception_handler(lambda loop, ctx: messages.append(ctx))
 
         with test_utils.run_test_server() as httpd:
-            rd, wr = self.loop.run_until_complete(
-                    asyncio.open_connection(*httpd.address))
+            with self.assertWarns(DeprecationWarning):
+                rd, wr = self.loop.run_until_complete(
+                    asyncio.open_connection(*httpd.address,
+                                            loop=self.loop))
 
             wr.close()
             f = wr.wait_closed()
             self.loop.run_until_complete(f)
-            self.assertTrue(rd.at_eof())
+            assert rd.at_eof()
             f = rd.read()
             data = self.loop.run_until_complete(f)
-            self.assertEqual(data, b'')
+            assert data == b''
 
         self.assertEqual(messages, [])
 

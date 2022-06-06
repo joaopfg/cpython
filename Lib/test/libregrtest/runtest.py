@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import faulthandler
 import functools
 import gc
@@ -10,11 +12,10 @@ import traceback
 import unittest
 
 from test import support
-from test.support import os_helper
-from test.support import threading_helper
+from test.libregrtest.refleak import dash_R, clear_caches
 from test.libregrtest.cmdline import Namespace
 from test.libregrtest.save_env import saved_test_environment
-from test.libregrtest.utils import clear_caches, format_duration, print_warning
+from test.libregrtest.utils import format_duration, print_warning
 
 
 class TestResult:
@@ -139,7 +140,7 @@ STDTESTS = [
 NOTTESTS = set()
 
 
-# Storage of uncollectable objects
+# used by --findleaks, store for gc.garbage
 FOUND_GARBAGE = []
 
 
@@ -180,9 +181,7 @@ def _runtest(ns: Namespace, test_name: str) -> TestResult:
 
     output_on_failure = ns.verbose3
 
-    use_timeout = (
-        ns.timeout is not None and threading_helper.can_start_thread
-    )
+    use_timeout = (ns.timeout is not None)
     if use_timeout:
         faulthandler.dump_traceback_later(ns.timeout, exit=True)
 
@@ -199,30 +198,18 @@ def _runtest(ns: Namespace, test_name: str) -> TestResult:
             stream = io.StringIO()
             orig_stdout = sys.stdout
             orig_stderr = sys.stderr
-            print_warning = support.print_warning
-            orig_print_warnings_stderr = print_warning.orig_stderr
-
-            output = None
             try:
                 sys.stdout = stream
                 sys.stderr = stream
-                # print_warning() writes into the temporary stream to preserve
-                # messages order. If support.environment_altered becomes true,
-                # warnings will be written to sys.stderr below.
-                print_warning.orig_stderr = stream
-
                 result = _runtest_inner(ns, test_name,
                                         display_failure=False)
                 if not isinstance(result, Passed):
                     output = stream.getvalue()
+                    orig_stderr.write(output)
+                    orig_stderr.flush()
             finally:
                 sys.stdout = orig_stdout
                 sys.stderr = orig_stderr
-                print_warning.orig_stderr = orig_print_warnings_stderr
-
-            if output is not None:
-                sys.stderr.write(output)
-                sys.stderr.flush()
         else:
             # Tell tests to be moderately quiet
             support.verbose = ns.verbose
@@ -276,26 +263,16 @@ def _test_module(the_module):
     support.run_unittest(tests)
 
 
-def save_env(ns: Namespace, test_name: str):
-    return saved_test_environment(test_name, ns.verbose, ns.quiet, pgo=ns.pgo)
-
-
 def _runtest_inner2(ns: Namespace, test_name: str) -> bool:
     # Load the test function, run the test function, handle huntrleaks
-    # to detect leaks.
+    # and findleaks to detect leaks
 
     abstest = get_abs_module(ns, test_name)
 
     # remove the module from sys.module to reload it if it was already imported
-    try:
-        del sys.modules[abstest]
-    except KeyError:
-        pass
+    support.unload(abstest)
 
     the_module = importlib.import_module(abstest)
-
-    if ns.huntrleaks:
-        from test.libregrtest.refleak import dash_R
 
     # If the test has a test_main, that will run the appropriate
     # tests.  If not, use normal unittest test loading.
@@ -304,21 +281,16 @@ def _runtest_inner2(ns: Namespace, test_name: str) -> bool:
         test_runner = functools.partial(_test_module, the_module)
 
     try:
-        with save_env(ns, test_name):
-            if ns.huntrleaks:
-                # Return True if the test leaked references
-                refleak = dash_R(ns, test_name, test_runner)
-            else:
-                test_runner()
-                refleak = False
+        if ns.huntrleaks:
+            # Return True if the test leaked references
+            refleak = dash_R(ns, test_name, test_runner)
+        else:
+            test_runner()
+            refleak = False
     finally:
-        # First kill any dangling references to open files etc.
-        # This can also issue some ResourceWarnings which would otherwise get
-        # triggered during the following test run, and possibly produce
-        # failures.
-        support.gc_collect()
-
         cleanup_test_droppings(test_name, ns.verbose)
+
+    support.gc_collect()
 
     if gc.garbage:
         support.environment_altered = True
@@ -349,9 +321,8 @@ def _runtest_inner(
 
     try:
         clear_caches()
-        support.gc_collect()
 
-        with save_env(ns, test_name):
+        with saved_test_environment(test_name, ns.verbose, ns.quiet, pgo=ns.pgo) as environment:
             refleak = _runtest_inner2(ns, test_name)
     except support.ResourceDenied as msg:
         if not ns.quiet and not ns.pgo:
@@ -387,19 +358,24 @@ def _runtest_inner(
 
     if refleak:
         return RefLeak(test_name)
-    if support.environment_altered:
+    if environment.changed:
         return EnvChanged(test_name)
     return Passed(test_name)
 
 
 def cleanup_test_droppings(test_name: str, verbose: int) -> None:
+    # First kill any dangling references to open files etc.
+    # This can also issue some ResourceWarnings which would otherwise get
+    # triggered during the following test run, and possibly produce failures.
+    support.gc_collect()
+
     # Try to clean up junk commonly left behind.  While tests shouldn't leave
     # any files or directories behind, when a test fails that can be tedious
     # for it to arrange.  The consequences can be especially nasty on Windows,
     # since if a test leaves a file open, it cannot be deleted by name (while
     # there's nothing we can do about that here either, we can display the
     # name of the offending test, which is a real help).
-    for name in (os_helper.TESTFN,):
+    for name in (support.TESTFN,):
         if not os.path.exists(name):
             continue
 

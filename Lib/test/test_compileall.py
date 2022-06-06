@@ -16,17 +16,12 @@ import unittest
 
 from unittest import mock, skipUnless
 try:
-    # compileall relies on ProcessPoolExecutor if ProcessPoolExecutor exists
-    # and it can function.
     from concurrent.futures import ProcessPoolExecutor
-    from concurrent.futures.process import _check_system_limits
-    _check_system_limits()
     _have_multiprocessing = True
-except (NotImplementedError, ModuleNotFoundError):
+except ImportError:
     _have_multiprocessing = False
 
 from test import support
-from test.support import os_helper
 from test.support import script_helper
 from test.test_py_compile import without_source_date_epoch
 from test.test_py_compile import SourceDateEpochTestMeta
@@ -56,7 +51,7 @@ class CompileallTestsBase:
         self.directory = tempfile.mkdtemp()
         self.source_path = os.path.join(self.directory, '_test.py')
         self.bc_path = importlib.util.cache_from_source(self.source_path)
-        with open(self.source_path, 'w', encoding="utf-8") as file:
+        with open(self.source_path, 'w') as file:
             file.write('x = 123\n')
         self.source_path2 = os.path.join(self.directory, '_test2.py')
         self.bc_path2 = importlib.util.cache_from_source(self.source_path2)
@@ -71,7 +66,7 @@ class CompileallTestsBase:
 
     def add_bad_source_file(self):
         self.bad_source_path = os.path.join(self.directory, '_test_bad.py')
-        with open(self.bad_source_path, 'w', encoding="utf-8") as file:
+        with open(self.bad_source_path, 'w') as file:
             file.write('x (\n')
 
     def timestamp_metadata(self):
@@ -183,7 +178,7 @@ class CompileallTestsBase:
         data_file = os.path.join(data_dir, 'file')
         os.mkdir(data_dir)
         # touch data/file
-        with open(data_file, 'wb'):
+        with open(data_file, 'w'):
             pass
         compileall.compile_file(data_file)
         self.assertFalse(os.path.exists(os.path.join(data_dir, '__pycache__')))
@@ -219,7 +214,6 @@ class CompileallTestsBase:
         self.assertRegex(line, r'Listing ([^WindowsPath|PosixPath].*)')
         self.assertTrue(os.path.isfile(self.bc_path))
 
-    @skipUnless(_have_multiprocessing, "requires multiprocessing")
     @mock.patch('concurrent.futures.ProcessPoolExecutor')
     def test_compile_pool_called(self, pool_mock):
         compileall.compile_dir(self.directory, quiet=True, workers=5)
@@ -230,13 +224,11 @@ class CompileallTestsBase:
                                     "workers must be greater or equal to 0"):
             compileall.compile_dir(self.directory, workers=-1)
 
-    @skipUnless(_have_multiprocessing, "requires multiprocessing")
     @mock.patch('concurrent.futures.ProcessPoolExecutor')
     def test_compile_workers_cpu_count(self, pool_mock):
         compileall.compile_dir(self.directory, quiet=True, workers=0)
         self.assertEqual(pool_mock.call_args[1]['max_workers'], None)
 
-    @skipUnless(_have_multiprocessing, "requires multiprocessing")
     @mock.patch('concurrent.futures.ProcessPoolExecutor')
     @mock.patch('compileall.compile_file')
     def test_compile_one_worker(self, compile_file_mock, pool_mock):
@@ -244,7 +236,6 @@ class CompileallTestsBase:
         self.assertFalse(pool_mock.called)
         self.assertTrue(compile_file_mock.called)
 
-    @skipUnless(_have_multiprocessing, "requires multiprocessing")
     @mock.patch('concurrent.futures.ProcessPoolExecutor', new=None)
     @mock.patch('compileall.compile_file')
     def test_compile_missing_multiprocessing(self, compile_file_mock):
@@ -297,7 +288,6 @@ class CompileallTestsBase:
         """Recursive compile_dir ddir= contains package paths; bpo39769."""
         return self._test_ddir_only(ddir="<a prefix>", parallel=False)
 
-    @skipUnless(_have_multiprocessing, "requires multiprocessing")
     def test_ddir_multiple_workers(self):
         """Recursive compile_dir ddir= contains package paths; bpo39769."""
         return self._test_ddir_only(ddir="<a prefix>", parallel=True)
@@ -306,7 +296,6 @@ class CompileallTestsBase:
         """Recursive compile_dir ddir='' contains package paths; bpo39769."""
         return self._test_ddir_only(ddir="", parallel=False)
 
-    @skipUnless(_have_multiprocessing, "requires multiprocessing")
     def test_ddir_empty_multiple_workers(self):
         """Recursive compile_dir ddir='' contains package paths; bpo39769."""
         return self._test_ddir_only(ddir="", parallel=True)
@@ -394,7 +383,7 @@ class CompileallTestsBase:
                 except Exception:
                     pass
 
-    @os_helper.skip_unless_symlink
+    @support.skip_unless_symlink
     def test_ignore_symlink_destination(self):
         # Create folders for allowed files, symlinks and prohibited area
         allowed_path = os.path.join(self.directory, "test", "dir", "allowed")
@@ -462,7 +451,7 @@ class CommandLineTestsBase:
 
     def setUp(self):
         self.directory = tempfile.mkdtemp()
-        self.addCleanup(os_helper.rmtree, self.directory)
+        self.addCleanup(shutil.rmtree, self.directory)
         self.pkgdir = os.path.join(self.directory, 'foo')
         os.mkdir(self.pkgdir)
         self.pkgdir_cachedir = os.path.join(self.pkgdir, '__pycache__')
@@ -650,7 +639,7 @@ class CommandLineTestsBase:
         self.assertCompiled(spamfn)
         self.assertCompiled(eggfn)
 
-    @os_helper.skip_unless_symlink
+    @support.skip_unless_symlink
     def test_symlink_loop(self):
         # Currently, compileall ignores symlinks to directories.
         # If that limitation is ever lifted, it should protect against
@@ -721,7 +710,7 @@ class CommandLineTestsBase:
         f2 = script_helper.make_script(self.pkgdir, 'f2', '')
         f3 = script_helper.make_script(self.pkgdir, 'f3', '')
         f4 = script_helper.make_script(self.pkgdir, 'f4', '')
-        with open(os.path.join(self.directory, 'l1'), 'w', encoding="utf-8") as l1:
+        with open(os.path.join(self.directory, 'l1'), 'w') as l1:
             l1.write(os.path.join(self.pkgdir, 'f1.py')+os.linesep)
             l1.write(os.path.join(self.pkgdir, 'f2.py')+os.linesep)
         self.assertRunOK('-i', os.path.join(self.directory, 'l1'), f4)
@@ -735,7 +724,7 @@ class CommandLineTestsBase:
         f2 = script_helper.make_script(self.pkgdir, 'f2', '')
         f3 = script_helper.make_script(self.pkgdir, 'f3', '')
         f4 = script_helper.make_script(self.pkgdir, 'f4', '')
-        with open(os.path.join(self.directory, 'l1'), 'w', encoding="utf-8") as l1:
+        with open(os.path.join(self.directory, 'l1'), 'w') as l1:
             l1.write(os.path.join(self.pkgdir, 'f2.py')+os.linesep)
         self.assertRunOK('-i', os.path.join(self.directory, 'l1'))
         self.assertNotCompiled(f1)
@@ -848,7 +837,7 @@ class CommandLineTestsBase:
                 except Exception:
                     pass
 
-    @os_helper.skip_unless_symlink
+    @support.skip_unless_symlink
     def test_ignore_symlink_destination(self):
         # Create folders for allowed files, symlinks and prohibited area
         allowed_path = os.path.join(self.directory, "test", "dir", "allowed")
@@ -915,7 +904,6 @@ class CommandLineTestsNoSourceEpoch(CommandLineTestsBase,
 
 
 
-@unittest.skipUnless(hasattr(os, 'link'), 'requires os.link')
 class HardlinkDedupTestsBase:
     # Test hardlink_dupes parameter of compileall.compile_dir()
 

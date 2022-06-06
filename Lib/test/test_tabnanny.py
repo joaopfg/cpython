@@ -11,8 +11,7 @@ import tokenize
 import tempfile
 import textwrap
 from test.support import (captured_stderr, captured_stdout, script_helper,
-                          findfile)
-from test.support.os_helper import unlink
+                          findfile, unlink)
 
 
 SOURCE_CODES = {

@@ -1,6 +1,5 @@
 from pathlib import Path
-from test.support.import_helper import unload, CleanImport
-from test.support.warnings_helper import check_warnings
+from test.support import unload, check_warnings, CleanImport
 import unittest
 import sys
 import importlib
@@ -537,8 +536,7 @@ class ImportlibMigrationTests(unittest.TestCase):
 
     def check_deprecated(self):
         return check_warnings(
-            ("This emulation is deprecated and slated for removal in "
-             "Python 3.12; use 'importlib' instead",
+            ("This emulation is deprecated, use 'importlib' instead",
              DeprecationWarning))
 
     def test_importer_deprecated(self):

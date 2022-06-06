@@ -1,7 +1,7 @@
-from test.support import import_helper
+from test import support
 
 # Skip this test if _tkinter does not exist.
-import_helper.import_module('_tkinter')
+support.import_module('_tkinter')
 
 import unittest
 from tkinter import ttk

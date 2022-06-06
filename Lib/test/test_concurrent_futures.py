@@ -1,9 +1,9 @@
 from test import support
-from test.support import import_helper
-from test.support import threading_helper
 
 # Skip tests if _multiprocessing wasn't built.
-import_helper.import_module('_multiprocessing')
+support.import_module('_multiprocessing')
+# Skip tests if sem_open implementation is broken.
+support.skip_if_broken_multiprocessing_synchronize()
 
 from test.support import hashlib_helper
 from test.support.script_helper import assert_python_ok
@@ -25,7 +25,7 @@ from concurrent import futures
 from concurrent.futures._base import (
     PENDING, RUNNING, CANCELLED, CANCELLED_AND_NOTIFIED, FINISHED, Future,
     BrokenExecutor)
-from concurrent.futures.process import BrokenProcessPool, _check_system_limits
+from concurrent.futures.process import BrokenProcessPool
 
 import multiprocessing.process
 import multiprocessing.util
@@ -54,6 +54,7 @@ EXCEPTION_FUTURE = create_future(state=FINISHED, exception=OSError())
 SUCCESSFUL_FUTURE = create_future(state=FINISHED, result=42)
 
 INITIALIZER_STATUS = 'uninitialized'
+
 
 def mul(x, y):
     return x * y
@@ -106,11 +107,11 @@ def make_dummy_object(_):
 
 class BaseTestCase(unittest.TestCase):
     def setUp(self):
-        self._thread_key = threading_helper.threading_setup()
+        self._thread_key = support.threading_setup()
 
     def tearDown(self):
         support.reap_children()
-        threading_helper.threading_cleanup(*self._thread_key)
+        support.threading_cleanup(*self._thread_key)
 
 
 class ExecutorMixin:
@@ -155,10 +156,6 @@ class ProcessPoolForkMixin(ExecutorMixin):
     ctx = "fork"
 
     def get_context(self):
-        try:
-            _check_system_limits()
-        except NotImplementedError:
-            self.skipTest("ProcessPoolExecutor unavailable on this system")
         if sys.platform == "win32":
             self.skipTest("require unix system")
         return super().get_context()
@@ -168,23 +165,12 @@ class ProcessPoolSpawnMixin(ExecutorMixin):
     executor_type = futures.ProcessPoolExecutor
     ctx = "spawn"
 
-    def get_context(self):
-        try:
-            _check_system_limits()
-        except NotImplementedError:
-            self.skipTest("ProcessPoolExecutor unavailable on this system")
-        return super().get_context()
-
 
 class ProcessPoolForkserverMixin(ExecutorMixin):
     executor_type = futures.ProcessPoolExecutor
     ctx = "forkserver"
 
     def get_context(self):
-        try:
-            _check_system_limits()
-        except NotImplementedError:
-            self.skipTest("ProcessPoolExecutor unavailable on this system")
         if sys.platform == "win32":
             self.skipTest("require unix system")
         return super().get_context()
@@ -1048,55 +1034,6 @@ class ProcessPoolExecutorTest(ExecutorTest):
         self.assertLessEqual(len(executor._processes), 3)
         executor.shutdown()
 
-    def test_max_tasks_per_child(self):
-        context = self.get_context()
-        if context.get_start_method(allow_none=False) == "fork":
-            with self.assertRaises(ValueError):
-                self.executor_type(1, mp_context=context, max_tasks_per_child=3)
-            return
-        # not using self.executor as we need to control construction.
-        # arguably this could go in another class w/o that mixin.
-        executor = self.executor_type(
-                1, mp_context=context, max_tasks_per_child=3)
-        f1 = executor.submit(os.getpid)
-        original_pid = f1.result()
-        # The worker pid remains the same as the worker could be reused
-        f2 = executor.submit(os.getpid)
-        self.assertEqual(f2.result(), original_pid)
-        self.assertEqual(len(executor._processes), 1)
-        f3 = executor.submit(os.getpid)
-        self.assertEqual(f3.result(), original_pid)
-
-        # A new worker is spawned, with a statistically different pid,
-        # while the previous was reaped.
-        f4 = executor.submit(os.getpid)
-        new_pid = f4.result()
-        self.assertNotEqual(original_pid, new_pid)
-        self.assertEqual(len(executor._processes), 1)
-
-        executor.shutdown()
-
-    def test_max_tasks_per_child_defaults_to_spawn_context(self):
-        # not using self.executor as we need to control construction.
-        # arguably this could go in another class w/o that mixin.
-        executor = self.executor_type(1, max_tasks_per_child=3)
-        self.assertEqual(executor._mp_context.get_start_method(), "spawn")
-
-    def test_max_tasks_early_shutdown(self):
-        context = self.get_context()
-        if context.get_start_method(allow_none=False) == "fork":
-            raise unittest.SkipTest("Incompatible with the fork start method.")
-        # not using self.executor as we need to control construction.
-        # arguably this could go in another class w/o that mixin.
-        executor = self.executor_type(
-                3, mp_context=context, max_tasks_per_child=1)
-        futures = []
-        for i in range(6):
-            futures.append(executor.submit(mul, i, i))
-        executor.shutdown()
-        for i, future in enumerate(futures):
-            self.assertEqual(future.result(), mul(i, i))
-
 
 create_executor_tests(ProcessPoolExecutorTest,
                       executor_mixins=(ProcessPoolForkMixin,
@@ -1591,8 +1528,8 @@ class FutureTests(BaseTestCase):
 
 def setUpModule():
     unittest.addModuleCleanup(multiprocessing.util._cleanup_tests)
-    thread_info = threading_helper.threading_setup()
-    unittest.addModuleCleanup(threading_helper.threading_cleanup, *thread_info)
+    thread_info = support.threading_setup()
+    unittest.addModuleCleanup(support.threading_cleanup, *thread_info)
 
 
 if __name__ == "__main__":

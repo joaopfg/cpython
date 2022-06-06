@@ -19,17 +19,14 @@ import gc
 from weakref import proxy
 import contextlib
 
-from test.support import import_helper
-from test.support import threading_helper
 from test.support.script_helper import assert_python_ok
 
 import functools
 
-py_functools = import_helper.import_fresh_module('functools',
-                                                 blocked=['_functools'])
-c_functools = import_helper.import_fresh_module('functools')
+py_functools = support.import_fresh_module('functools', blocked=['_functools'])
+c_functools = support.import_fresh_module('functools', fresh=['_functools'])
 
-decimal = import_helper.import_fresh_module('decimal', fresh=['_decimal'])
+decimal = support.import_fresh_module('decimal', fresh=['_decimal'])
 
 @contextlib.contextmanager
 def replaced_module(name, replacement):
@@ -949,13 +946,6 @@ class TestCmpToKeyC(TestCmpToKey, unittest.TestCase):
     if c_functools:
         cmp_to_key = c_functools.cmp_to_key
 
-    @support.cpython_only
-    def test_disallow_instantiation(self):
-        # Ensure that the type disallows instantiation (bpo-43916)
-        support.check_disallow_instantiation(
-            self, type(c_functools.cmp_to_key(None))
-        )
-
 
 class TestCmpToKeyPy(TestCmpToKey, unittest.TestCase):
     cmp_to_key = staticmethod(py_functools.cmp_to_key)
@@ -1048,73 +1038,6 @@ class TestTotalOrdering(unittest.TestCase):
             @functools.total_ordering
             class A:
                 pass
-
-    def test_notimplemented(self):
-        # Verify NotImplemented results are correctly handled
-        @functools.total_ordering
-        class ImplementsLessThan:
-            def __init__(self, value):
-                self.value = value
-            def __eq__(self, other):
-                if isinstance(other, ImplementsLessThan):
-                    return self.value == other.value
-                return False
-            def __lt__(self, other):
-                if isinstance(other, ImplementsLessThan):
-                    return self.value < other.value
-                return NotImplemented
-
-        @functools.total_ordering
-        class ImplementsLessThanEqualTo:
-            def __init__(self, value):
-                self.value = value
-            def __eq__(self, other):
-                if isinstance(other, ImplementsLessThanEqualTo):
-                    return self.value == other.value
-                return False
-            def __le__(self, other):
-                if isinstance(other, ImplementsLessThanEqualTo):
-                    return self.value <= other.value
-                return NotImplemented
-
-        @functools.total_ordering
-        class ImplementsGreaterThan:
-            def __init__(self, value):
-                self.value = value
-            def __eq__(self, other):
-                if isinstance(other, ImplementsGreaterThan):
-                    return self.value == other.value
-                return False
-            def __gt__(self, other):
-                if isinstance(other, ImplementsGreaterThan):
-                    return self.value > other.value
-                return NotImplemented
-
-        @functools.total_ordering
-        class ImplementsGreaterThanEqualTo:
-            def __init__(self, value):
-                self.value = value
-            def __eq__(self, other):
-                if isinstance(other, ImplementsGreaterThanEqualTo):
-                    return self.value == other.value
-                return False
-            def __ge__(self, other):
-                if isinstance(other, ImplementsGreaterThanEqualTo):
-                    return self.value >= other.value
-                return NotImplemented
-
-        self.assertIs(ImplementsLessThan(1).__le__(1), NotImplemented)
-        self.assertIs(ImplementsLessThan(1).__gt__(1), NotImplemented)
-        self.assertIs(ImplementsLessThan(1).__ge__(1), NotImplemented)
-        self.assertIs(ImplementsLessThanEqualTo(1).__lt__(1), NotImplemented)
-        self.assertIs(ImplementsLessThanEqualTo(1).__gt__(1), NotImplemented)
-        self.assertIs(ImplementsLessThanEqualTo(1).__ge__(1), NotImplemented)
-        self.assertIs(ImplementsGreaterThan(1).__lt__(1), NotImplemented)
-        self.assertIs(ImplementsGreaterThan(1).__gt__(1), NotImplemented)
-        self.assertIs(ImplementsGreaterThan(1).__ge__(1), NotImplemented)
-        self.assertIs(ImplementsGreaterThanEqualTo(1).__lt__(1), NotImplemented)
-        self.assertIs(ImplementsGreaterThanEqualTo(1).__le__(1), NotImplemented)
-        self.assertIs(ImplementsGreaterThanEqualTo(1).__gt__(1), NotImplemented)
 
     def test_type_error_when_not_implemented(self):
         # bug 10042; ensure stack overflow does not occur
@@ -1481,7 +1404,7 @@ class TestLRU:
 
     def test_lru_star_arg_handling(self):
         # Test regression that arose in ea064ff3c10f
-        @self.module.lru_cache()
+        @functools.lru_cache()
         def f(*args):
             return args
 
@@ -1493,11 +1416,11 @@ class TestLRU:
         # lru_cache was leaking when one of the arguments
         # wasn't cacheable.
 
-        @self.module.lru_cache(maxsize=None)
+        @functools.lru_cache(maxsize=None)
         def infinite_cache(o):
             pass
 
-        @self.module.lru_cache(maxsize=10)
+        @functools.lru_cache(maxsize=10)
         def limited_cache(o):
             pass
 
@@ -1562,33 +1485,6 @@ class TestLRU:
             self.assertEqual(square.cache_info().hits, 4)
             self.assertEqual(square.cache_info().misses, 4)
 
-    def test_lru_cache_typed_is_not_recursive(self):
-        cached = self.module.lru_cache(typed=True)(repr)
-
-        self.assertEqual(cached(1), '1')
-        self.assertEqual(cached(True), 'True')
-        self.assertEqual(cached(1.0), '1.0')
-        self.assertEqual(cached(0), '0')
-        self.assertEqual(cached(False), 'False')
-        self.assertEqual(cached(0.0), '0.0')
-
-        self.assertEqual(cached((1,)), '(1,)')
-        self.assertEqual(cached((True,)), '(1,)')
-        self.assertEqual(cached((1.0,)), '(1,)')
-        self.assertEqual(cached((0,)), '(0,)')
-        self.assertEqual(cached((False,)), '(0,)')
-        self.assertEqual(cached((0.0,)), '(0,)')
-
-        class T(tuple):
-            pass
-
-        self.assertEqual(cached(T((1,))), '(1,)')
-        self.assertEqual(cached(T((True,))), '(1,)')
-        self.assertEqual(cached(T((1.0,))), '(1,)')
-        self.assertEqual(cached(T((0,))), '(0,)')
-        self.assertEqual(cached(T((False,))), '(0,)')
-        self.assertEqual(cached(T((0.0,))), '(0,)')
-
     def test_lru_with_keyword_args(self):
         @self.module.lru_cache()
         def fib(n):
@@ -1637,7 +1533,6 @@ class TestLRU:
         for attr in self.module.WRAPPER_ASSIGNMENTS:
             self.assertEqual(getattr(g, attr), getattr(f, attr))
 
-    @threading_helper.requires_working_threading()
     def test_lru_cache_threaded(self):
         n, m = 5, 11
         def orig(x, y):
@@ -1663,7 +1558,7 @@ class TestLRU:
             # create n threads in order to fill cache
             threads = [threading.Thread(target=full, args=[k])
                        for k in range(n)]
-            with threading_helper.start_threads(threads):
+            with support.start_threads(threads):
                 start.set()
 
             hits, misses, maxsize, currsize = f.cache_info()
@@ -1681,12 +1576,11 @@ class TestLRU:
             threads += [threading.Thread(target=full, args=[k])
                         for k in range(n)]
             start.clear()
-            with threading_helper.start_threads(threads):
+            with support.start_threads(threads):
                 start.set()
         finally:
             sys.setswitchinterval(orig_si)
 
-    @threading_helper.requires_working_threading()
     def test_lru_cache_threaded2(self):
         # Simultaneous call with the same arguments
         n, m = 5, 7
@@ -1704,7 +1598,7 @@ class TestLRU:
                 self.assertEqual(f(i), 3 * i)
                 stop.wait(10)
         threads = [threading.Thread(target=test) for k in range(n)]
-        with threading_helper.start_threads(threads):
+        with support.start_threads(threads):
             for i in range(m):
                 start.wait(10)
                 stop.reset()
@@ -1714,7 +1608,6 @@ class TestLRU:
                 pause.reset()
                 self.assertEqual(f.cache_info(), (0, (i+1)*n, m*n, i+1))
 
-    @threading_helper.requires_working_threading()
     def test_lru_cache_threaded3(self):
         @self.module.lru_cache(maxsize=2)
         def f(x):
@@ -1725,7 +1618,7 @@ class TestLRU:
                 self.assertEqual(f(x), 3 * x, i)
         threads = [threading.Thread(target=test, args=(i, v))
                    for i, v in enumerate([1, 2, 2, 3, 2])]
-        with threading_helper.start_threads(threads):
+        with support.start_threads(threads):
             pass
 
     def test_need_for_rlock(self):
@@ -2754,17 +2647,6 @@ class TestSingleDispatch(unittest.TestCase):
             'typing.Iterable[str] is not a class.'
         ))
 
-        with self.assertRaises(TypeError) as exc:
-            @i.register
-            def _(arg: typing.Union[int, typing.Iterable[str]]):
-                return "Invalid Union"
-        self.assertTrue(str(exc.exception).startswith(
-            "Invalid annotation for 'arg'."
-        ))
-        self.assertTrue(str(exc.exception).endswith(
-            'typing.Union[int, typing.Iterable[str]] not all arguments are classes.'
-        ))
-
     def test_invalid_positional_argument(self):
         @functools.singledispatch
         def f(*args):
@@ -2772,68 +2654,6 @@ class TestSingleDispatch(unittest.TestCase):
         msg = 'f requires at least 1 positional argument'
         with self.assertRaisesRegex(TypeError, msg):
             f()
-
-    def test_union(self):
-        @functools.singledispatch
-        def f(arg):
-            return "default"
-
-        @f.register
-        def _(arg: typing.Union[str, bytes]):
-            return "typing.Union"
-
-        @f.register
-        def _(arg: int | float):
-            return "types.UnionType"
-
-        self.assertEqual(f([]), "default")
-        self.assertEqual(f(""), "typing.Union")
-        self.assertEqual(f(b""), "typing.Union")
-        self.assertEqual(f(1), "types.UnionType")
-        self.assertEqual(f(1.0), "types.UnionType")
-
-    def test_union_conflict(self):
-        @functools.singledispatch
-        def f(arg):
-            return "default"
-
-        @f.register
-        def _(arg: typing.Union[str, bytes]):
-            return "typing.Union"
-
-        @f.register
-        def _(arg: int | str):
-            return "types.UnionType"
-
-        self.assertEqual(f([]), "default")
-        self.assertEqual(f(""), "types.UnionType")  # last one wins
-        self.assertEqual(f(b""), "typing.Union")
-        self.assertEqual(f(1), "types.UnionType")
-
-    def test_union_None(self):
-        @functools.singledispatch
-        def typing_union(arg):
-            return "default"
-
-        @typing_union.register
-        def _(arg: typing.Union[str, None]):
-            return "typing.Union"
-
-        self.assertEqual(typing_union(1), "default")
-        self.assertEqual(typing_union(""), "typing.Union")
-        self.assertEqual(typing_union(None), "typing.Union")
-
-        @functools.singledispatch
-        def types_union(arg):
-            return "default"
-
-        @types_union.register
-        def _(arg: int | None):
-            return "types.UnionType"
-
-        self.assertEqual(types_union(""), "default")
-        self.assertEqual(types_union(1), "types.UnionType")
-        self.assertEqual(types_union(None), "types.UnionType")
 
     def test_register_genericalias(self):
         @functools.singledispatch
@@ -2845,9 +2665,11 @@ class TestSingleDispatch(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "Invalid first argument to "):
             f.register(typing.List[int], lambda arg: "typing.GenericAlias")
         with self.assertRaisesRegex(TypeError, "Invalid first argument to "):
-            f.register(list[int] | str, lambda arg: "types.UnionTypes(types.GenericAlias)")
+            f.register(typing.Union[list[int], str], lambda arg: "typing.Union[types.GenericAlias]")
         with self.assertRaisesRegex(TypeError, "Invalid first argument to "):
-            f.register(typing.List[float] | bytes, lambda arg: "typing.Union[typing.GenericAlias]")
+            f.register(typing.Union[typing.List[float], bytes], lambda arg: "typing.Union[typing.GenericAlias]")
+        with self.assertRaisesRegex(TypeError, "Invalid first argument to "):
+            f.register(typing.Any, lambda arg: "typing.Any")
 
         self.assertEqual(f([1]), "default")
         self.assertEqual(f([1.0]), "default")
@@ -2864,9 +2686,11 @@ class TestSingleDispatch(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "Invalid first argument to "):
             f.register(typing.List[int])
         with self.assertRaisesRegex(TypeError, "Invalid first argument to "):
-            f.register(list[int] | str)
+            f.register(typing.Union[list[int], str])
         with self.assertRaisesRegex(TypeError, "Invalid first argument to "):
-            f.register(typing.List[int] | str)
+            f.register(typing.Union[typing.List[int], str])
+        with self.assertRaisesRegex(TypeError, "Invalid first argument to "):
+            f.register(typing.Any)
 
     def test_register_genericalias_annotation(self):
         @functools.singledispatch
@@ -2883,12 +2707,16 @@ class TestSingleDispatch(unittest.TestCase):
                 return "typing.GenericAlias"
         with self.assertRaisesRegex(TypeError, "Invalid annotation for 'arg'"):
             @f.register
-            def _(arg: list[int] | str):
+            def _(arg: typing.Union[list[int], str]):
                 return "types.UnionType(types.GenericAlias)"
         with self.assertRaisesRegex(TypeError, "Invalid annotation for 'arg'"):
             @f.register
-            def _(arg: typing.List[float] | bytes):
+            def _(arg: typing.Union[typing.List[float], bytes]):
                 return "typing.Union[typing.GenericAlias]"
+        with self.assertRaisesRegex(TypeError, "Invalid annotation for 'arg'"):
+            @f.register
+            def _(arg: typing.Any):
+                return "typing.Any"
 
         self.assertEqual(f([1]), "default")
         self.assertEqual(f([1.0]), "default")
@@ -2960,7 +2788,6 @@ class TestCachedProperty(unittest.TestCase):
         self.assertEqual(item.get_cost(), 4)
         self.assertEqual(item.cached_cost, 3)
 
-    @threading_helper.requires_working_threading()
     def test_threaded(self):
         go = threading.Event()
         item = CachedCostItemWait(go)
@@ -2974,7 +2801,7 @@ class TestCachedProperty(unittest.TestCase):
                 threading.Thread(target=lambda: item.cost)
                 for k in range(num_threads)
             ]
-            with threading_helper.start_threads(threads):
+            with support.start_threads(threads):
                 go.set()
         finally:
             sys.setswitchinterval(orig_si)

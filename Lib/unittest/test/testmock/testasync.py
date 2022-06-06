@@ -4,9 +4,6 @@ import inspect
 import re
 import unittest
 from contextlib import contextmanager
-from test import support
-
-support.requires_working_socket(module=True)
 
 from asyncio import run, iscoroutinefunction
 from unittest import IsolatedAsyncioTestCase
@@ -176,7 +173,8 @@ class AsyncMockTest(unittest.TestCase):
 
     def test_future_isfuture(self):
         loop = asyncio.new_event_loop()
-        fut = loop.create_future()
+        asyncio.set_event_loop(loop)
+        fut = asyncio.Future()
         loop.stop()
         loop.close()
         mock = AsyncMock(fut)
@@ -201,9 +199,9 @@ class AsyncAutospecTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             create_autospec(async_func, instance=True)
 
-    @unittest.skip('Broken test from https://bugs.python.org/issue37251')
     def test_create_autospec_awaitable_class(self):
-        self.assertIsInstance(create_autospec(AwaitableClass), AsyncMock)
+        awaitable_mock = create_autospec(spec=AwaitableClass())
+        self.assertIsInstance(create_autospec(awaitable_mock), AsyncMock)
 
     def test_create_autospec(self):
         spec = create_autospec(async_func_args)

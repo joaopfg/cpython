@@ -3,13 +3,9 @@ import pickle
 import sys
 
 from test import support
-from test.support import import_helper
 
-
-py_operator = import_helper.import_fresh_module('operator',
-                                                blocked=['_operator'])
-c_operator = import_helper.import_fresh_module('operator',
-                                               fresh=['_operator'])
+py_operator = support.import_fresh_module('operator', blocked=['_operator'])
+c_operator = support.import_fresh_module('operator', fresh=['_operator'])
 
 class Seq1:
     def __init__(self, lst):
@@ -45,18 +41,6 @@ class BadIterable:
 
 
 class OperatorTestCase:
-    def test___all__(self):
-        operator = self.module
-        actual_all = set(operator.__all__)
-        computed_all = set()
-        for name in vars(operator):
-            if name.startswith('__'):
-                continue
-            value = getattr(operator, name)
-            if value.__module__ in ('operator', '_operator'):
-                computed_all.add(name)
-        self.assertSetEqual(computed_all, actual_all)
-
     def test_lt(self):
         operator = self.module
         self.assertRaises(TypeError, operator.lt)
@@ -529,18 +513,6 @@ class OperatorTestCase:
             operator.length_hint(X(-2))
         with self.assertRaises(LookupError):
             operator.length_hint(X(LookupError))
-
-    def test_call(self):
-        operator = self.module
-
-        def func(*args, **kwargs): return args, kwargs
-
-        self.assertEqual(operator.call(func), ((), {}))
-        self.assertEqual(operator.call(func, 0, 1), ((0, 1), {}))
-        self.assertEqual(operator.call(func, a=2, obj=3),
-                         ((), {"a": 2, "obj": 3}))
-        self.assertEqual(operator.call(func, 0, 1, a=2, obj=3),
-                         ((0, 1), {"a": 2, "obj": 3}))
 
     def test_dunder_is_original(self):
         operator = self.module

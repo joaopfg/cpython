@@ -10,11 +10,10 @@ import time
 import unittest
 
 from test import support
-from test.support import import_helper
 from test.support import script_helper
 
 
-interpreters = import_helper.import_module('_xxsubinterpreters')
+interpreters = support.import_module('_xxsubinterpreters')
 
 
 ##################################
@@ -25,11 +24,11 @@ def _captured_script(script):
     indented = script.replace('\n', '\n                ')
     wrapped = dedent(f"""
         import contextlib
-        with open({w}, 'w', encoding="utf-8") as spipe:
+        with open({w}, 'w') as spipe:
             with contextlib.redirect_stdout(spipe):
                 {indented}
         """)
-    return wrapped, open(r, encoding="utf-8")
+    return wrapped, open(r)
 
 
 def _run_output(interp, request, shared=None):
@@ -59,7 +58,7 @@ def _running(interp):
     def run():
         interpreters.run_string(interp, dedent(f"""
             # wait for "signal"
-            with open({r}, encoding="utf-8") as rpipe:
+            with open({r}) as rpipe:
                 rpipe.read()
             """))
 
@@ -69,7 +68,7 @@ def _running(interp):
 
     yield
 
-    with open(w, 'w', encoding="utf-8") as spipe:
+    with open(w, 'w') as spipe:
         spipe.write('done')
     t.join()
 
@@ -489,7 +488,6 @@ class IsRunningTests(TestBase):
         main = interpreters.get_main()
         self.assertTrue(interpreters.is_running(main))
 
-    @unittest.skip('Fails on FreeBSD')
     def test_subinterpreter(self):
         interp = interpreters.create()
         self.assertFalse(interpreters.is_running(interp))
@@ -776,9 +774,21 @@ class DestroyTests(TestBase):
 
 class RunStringTests(TestBase):
 
+    SCRIPT = dedent("""
+        with open('{}', 'w') as out:
+            out.write('{}')
+        """)
+    FILENAME = 'spam'
+
     def setUp(self):
         super().setUp()
         self.id = interpreters.create()
+        self._fs = None
+
+    def tearDown(self):
+        if self._fs is not None:
+            self._fs.close()
+        super().tearDown()
 
     def test_success(self):
         script, file = _captured_script('print("it worked!", end="")')
@@ -818,10 +828,10 @@ class RunStringTests(TestBase):
 
         self.assertEqual(out, 'it worked!')
 
-    @support.requires_fork()
+    @unittest.skipUnless(hasattr(os, 'fork'), "test needs os.fork()")
     def test_fork(self):
         import tempfile
-        with tempfile.NamedTemporaryFile('w+', encoding="utf-8") as file:
+        with tempfile.NamedTemporaryFile('w+') as file:
             file.write('')
             file.flush()
 
@@ -831,7 +841,7 @@ class RunStringTests(TestBase):
                 try:
                     os.fork()
                 except RuntimeError:
-                    with open('{file.name}', 'w', encoding='utf-8') as out:
+                    with open('{file.name}', 'w') as out:
                         out.write('{expected}')
                 """)
             interpreters.run_string(self.id, script)

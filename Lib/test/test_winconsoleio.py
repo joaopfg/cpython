@@ -6,7 +6,7 @@ import os
 import sys
 import tempfile
 import unittest
-from test.support import os_helper
+from test import support
 
 if sys.platform != 'win32':
     raise unittest.SkipTest("test only relevant on win32")
@@ -111,7 +111,7 @@ class WindowsConsoleIOTests(unittest.TestCase):
 
     def test_conout_path(self):
         temp_path = tempfile.mkdtemp()
-        self.addCleanup(os_helper.rmtree, temp_path)
+        self.addCleanup(support.rmtree, temp_path)
 
         conout_path = os.path.join(temp_path, 'CONOUT$')
 

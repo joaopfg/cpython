@@ -19,11 +19,8 @@ import time
 import unittest
 from test import libregrtest
 from test import support
-from test.support import os_helper
-from test.libregrtest import utils, setup
+from test.libregrtest import utils
 
-if not support.has_subprocess_support:
-    raise unittest.SkipTest("test module requires subprocess")
 
 Py_DEBUG = hasattr(sys, 'gettotalrefcount')
 ROOT_DIR = os.path.join(os.path.dirname(__file__), '..', '..')
@@ -165,12 +162,12 @@ class ParseArgsTestCase(unittest.TestCase):
                 self.assertEqual(ns.ignore_tests, ['pattern'])
                 self.checkError([opt], 'expected one argument')
 
-        self.addCleanup(os_helper.unlink, os_helper.TESTFN)
-        with open(os_helper.TESTFN, "w") as fp:
+        self.addCleanup(support.unlink, support.TESTFN)
+        with open(support.TESTFN, "w") as fp:
             print('matchfile1', file=fp)
             print('matchfile2', file=fp)
 
-        filename = os.path.abspath(os_helper.TESTFN)
+        filename = os.path.abspath(support.TESTFN)
         ns = libregrtest._parse_args(['-m', 'match',
                                       '--ignorefile', filename])
         self.assertEqual(ns.ignore_tests,
@@ -187,12 +184,12 @@ class ParseArgsTestCase(unittest.TestCase):
                                       '-m', 'pattern2'])
         self.assertEqual(ns.match_tests, ['pattern1', 'pattern2'])
 
-        self.addCleanup(os_helper.unlink, os_helper.TESTFN)
-        with open(os_helper.TESTFN, "w") as fp:
+        self.addCleanup(support.unlink, support.TESTFN)
+        with open(support.TESTFN, "w") as fp:
             print('matchfile1', file=fp)
             print('matchfile2', file=fp)
 
-        filename = os.path.abspath(os_helper.TESTFN)
+        filename = os.path.abspath(support.TESTFN)
         ns = libregrtest._parse_args(['-m', 'match',
                                       '--matchfile', filename])
         self.assertEqual(ns.match_tests,
@@ -241,7 +238,7 @@ class ParseArgsTestCase(unittest.TestCase):
 
     def test_testdir(self):
         ns = libregrtest._parse_args(['--testdir', 'foo'])
-        self.assertEqual(ns.testdir, os.path.join(os_helper.SAVEDCWD, 'foo'))
+        self.assertEqual(ns.testdir, os.path.join(support.SAVEDCWD, 'foo'))
         self.checkError(['--testdir'], 'expected one argument')
 
     def test_runleaks(self):
@@ -288,7 +285,7 @@ class ParseArgsTestCase(unittest.TestCase):
             with self.subTest(opt=opt):
                 ns = libregrtest._parse_args([opt, 'foo'])
                 self.assertEqual(ns.coverdir,
-                                 os.path.join(os_helper.SAVEDCWD, 'foo'))
+                                 os.path.join(support.SAVEDCWD, 'foo'))
                 self.checkError([opt], 'expected one argument')
 
     def test_nocoverdir(self):
@@ -367,7 +364,7 @@ class BaseTestCase(unittest.TestCase):
         self.testdir = os.path.realpath(os.path.dirname(__file__))
 
         self.tmptestdir = tempfile.mkdtemp()
-        self.addCleanup(os_helper.rmtree, self.tmptestdir)
+        self.addCleanup(support.rmtree, self.tmptestdir)
 
     def create_test(self, name=None, code=None):
         if not name:
@@ -388,7 +385,7 @@ class BaseTestCase(unittest.TestCase):
         name = self.TESTNAME_PREFIX + name
         path = os.path.join(self.tmptestdir, name + '.py')
 
-        self.addCleanup(os_helper.unlink, path)
+        self.addCleanup(support.unlink, path)
         # Use 'x' mode to ensure that we do not override existing tests
         try:
             with open(path, 'x', encoding='utf-8') as fp:
@@ -771,8 +768,8 @@ class ArgsTestCase(BaseTestCase):
         # Write the list of files using a format similar to regrtest output:
         # [1/2] test_1
         # [2/2] test_2
-        filename = os_helper.TESTFN
-        self.addCleanup(os_helper.unlink, filename)
+        filename = support.TESTFN
+        self.addCleanup(support.unlink, filename)
 
         # test format '0:00:00 [2/7] test_opcodes -- test_grammar took 0 sec'
         with open(filename, "w") as fp:
@@ -887,7 +884,7 @@ class ArgsTestCase(BaseTestCase):
         test = self.create_test('huntrleaks', code=code)
 
         filename = 'reflog.txt'
-        self.addCleanup(os_helper.unlink, filename)
+        self.addCleanup(support.unlink, filename)
         output = self.run_tests('--huntrleaks', '3:3:', test,
                                 exitcode=2,
                                 stderr=subprocess.STDOUT)
@@ -998,8 +995,8 @@ class ArgsTestCase(BaseTestCase):
         testname = self.create_test(code=code)
 
         # only run a subset
-        filename = os_helper.TESTFN
-        self.addCleanup(os_helper.unlink, filename)
+        filename = support.TESTFN
+        self.addCleanup(support.unlink, filename)
 
         subset = [
             # only ignore the method name
@@ -1039,8 +1036,8 @@ class ArgsTestCase(BaseTestCase):
         self.assertEqual(methods, all_methods)
 
         # only run a subset
-        filename = os_helper.TESTFN
-        self.addCleanup(os_helper.unlink, filename)
+        filename = support.TESTFN
+        self.addCleanup(support.unlink, filename)
 
         subset = [
             # only match the method name
@@ -1180,7 +1177,7 @@ class ArgsTestCase(BaseTestCase):
                                   no_test_ran=[testname])
 
     @support.cpython_only
-    def test_uncollectable(self):
+    def test_findleaks(self):
         code = textwrap.dedent(r"""
             import _testcapi
             import gc
@@ -1201,6 +1198,12 @@ class ArgsTestCase(BaseTestCase):
         testname = self.create_test(code=code)
 
         output = self.run_tests("--fail-env-changed", testname, exitcode=3)
+        self.check_executed_tests(output, [testname],
+                                  env_changed=[testname],
+                                  fail_env_changed=True)
+
+        # --findleaks is now basically an alias to --fail-env-changed
+        output = self.run_tests("--findleaks", testname, exitcode=3)
         self.check_executed_tests(output, [testname],
                                   env_changed=[testname],
                                   fail_env_changed=True)
@@ -1234,7 +1237,7 @@ class ArgsTestCase(BaseTestCase):
 
     def test_unraisable_exc(self):
         # --fail-env-changed must catch unraisable exception.
-        # The exception must be displayed even if sys.stderr is redirected.
+        # The exceptioin must be displayed even if sys.stderr is redirected.
         code = textwrap.dedent(r"""
             import unittest
             import weakref
@@ -1264,85 +1267,6 @@ class ArgsTestCase(BaseTestCase):
                                   fail_env_changed=True)
         self.assertIn("Warning -- Unraisable exception", output)
         self.assertIn("Exception: weakref callback bug", output)
-
-    def test_threading_excepthook(self):
-        # --fail-env-changed must catch uncaught thread exception.
-        # The exception must be displayed even if sys.stderr is redirected.
-        code = textwrap.dedent(r"""
-            import threading
-            import unittest
-            from test.support import captured_stderr
-
-            class MyObject:
-                pass
-
-            def func_bug():
-                raise Exception("bug in thread")
-
-            class Tests(unittest.TestCase):
-                def test_threading_excepthook(self):
-                    with captured_stderr() as stderr:
-                        thread = threading.Thread(target=func_bug)
-                        thread.start()
-                        thread.join()
-                    self.assertEqual(stderr.getvalue(), '')
-        """)
-        testname = self.create_test(code=code)
-
-        output = self.run_tests("--fail-env-changed", "-v", testname, exitcode=3)
-        self.check_executed_tests(output, [testname],
-                                  env_changed=[testname],
-                                  fail_env_changed=True)
-        self.assertIn("Warning -- Uncaught thread exception", output)
-        self.assertIn("Exception: bug in thread", output)
-
-    def test_print_warning(self):
-        # bpo-45410: The order of messages must be preserved when -W and
-        # support.print_warning() are used.
-        code = textwrap.dedent(r"""
-            import sys
-            import unittest
-            from test import support
-
-            class MyObject:
-                pass
-
-            def func_bug():
-                raise Exception("bug in thread")
-
-            class Tests(unittest.TestCase):
-                def test_print_warning(self):
-                    print("msg1: stdout")
-                    support.print_warning("msg2: print_warning")
-                    # Fail with ENV CHANGED to see print_warning() log
-                    support.environment_altered = True
-        """)
-        testname = self.create_test(code=code)
-
-        # Expect an output like:
-        #
-        #   test_threading_excepthook (test.test_x.Tests) ... msg1: stdout
-        #   Warning -- msg2: print_warning
-        #   ok
-        regex = (r"test_print_warning.*msg1: stdout\n"
-                 r"Warning -- msg2: print_warning\n"
-                 r"ok\n")
-        for option in ("-v", "-W"):
-            with self.subTest(option=option):
-                cmd = ["--fail-env-changed", option, testname]
-                output = self.run_tests(*cmd, exitcode=3)
-                self.check_executed_tests(output, [testname],
-                                          env_changed=[testname],
-                                          fail_env_changed=True)
-                self.assertRegex(output, regex)
-
-    def test_unicode_guard_env(self):
-        guard = os.environ.get(setup.UNICODE_GUARD_ENV)
-        self.assertIsNotNone(guard, f"{setup.UNICODE_GUARD_ENV} not set")
-        if guard.isascii():
-            # Skip to signify that the env var value was changed by the user;
-            # possibly to something ASCII to work around Unicode issues.
-            self.skipTest("Modified guard")
 
     def test_cleanup(self):
         dirname = os.path.join(self.tmptestdir, "test_python_123")

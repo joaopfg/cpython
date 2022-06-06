@@ -12,7 +12,6 @@
 *.dll
 *.wasm
 *.orig
-*.pyc
 *.pyd
 *.pyo
 *.rej
@@ -24,7 +23,6 @@
 *.dyn
 .gdb_history
 .purify
-__pycache__
 .hg/
 .svn/
 .idea/
@@ -39,7 +37,6 @@ gmon.out
 .DS_Store
 
 *.exe
-!Lib/distutils/command/*.exe
 
 # Ignore core dumps... but not Tools/msi/core/ or the like.
 core
@@ -56,12 +53,6 @@ Doc/.venv/
 Doc/env/
 Doc/.env/
 Include/pydtrace_probes.h
-Lib/distutils/command/*.pdb
-Lib/lib2to3/*.pickle
-Lib/site-packages/*
-!Lib/site-packages/README.txt
-Lib/test/data/*
-!Lib/test/data/README
 /_bootstrap_python
 /Makefile
 /Makefile.pre

@@ -1,8 +1,6 @@
 import unittest
 from test import support
-from test.support import os_helper
 from test.support import socket_helper
-from test.support import warnings_helper
 from test import test_urllib
 
 import os
@@ -23,8 +21,6 @@ from urllib.request import (Request, OpenerDirector, HTTPBasicAuthHandler,
 from urllib.parse import urlparse
 import urllib.error
 import http.client
-
-support.requires_working_socket(module=True)
 
 # XXX
 # Request
@@ -785,7 +781,7 @@ class HandlerTests(unittest.TestCase):
         h = urllib.request.FileHandler()
         o = h.parent = MockOpener()
 
-        TESTFN = os_helper.TESTFN
+        TESTFN = support.TESTFN
         urlpath = sanepathname2url(os.path.abspath(TESTFN))
         towrite = b"hello, world\n"
         urls = [
@@ -1181,7 +1177,7 @@ class HandlerTests(unittest.TestCase):
         o = h.parent = MockOpener()
 
         # ordinary redirect behaviour
-        for code in 301, 302, 303, 307, 308:
+        for code in 301, 302, 303, 307:
             for data in None, "blah\nblah\n":
                 method = getattr(h, "http_error_%s" % code)
                 req = Request(from_url, data)
@@ -1194,8 +1190,8 @@ class HandlerTests(unittest.TestCase):
                     method(req, MockFile(), code, "Blah",
                            MockHeaders({"location": to_url}))
                 except urllib.error.HTTPError:
-                    # 307 and 308 in response to POST require user OK
-                    self.assertIn(code, (307, 308))
+                    # 307 in response to POST requires user OK
+                    self.assertEqual(code, 307)
                     self.assertIsNotNone(data)
                 self.assertEqual(o.req.get_full_url(), to_url)
                 try:
@@ -1522,7 +1518,7 @@ class HandlerTests(unittest.TestCase):
             self.check_basic_auth(headers, realm)
 
         # no quote: expect a warning
-        with warnings_helper.check_warnings(("Basic Auth Realm was unquoted",
+        with support.check_warnings(("Basic Auth Realm was unquoted",
                                      UserWarning)):
             headers = [f'WWW-Authenticate: Basic realm={realm}']
             self.check_basic_auth(headers, realm)

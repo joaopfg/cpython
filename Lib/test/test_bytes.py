@@ -16,8 +16,6 @@ import textwrap
 import unittest
 
 import test.support
-from test.support import import_helper
-from test.support import warnings_helper
 import test.string_tests
 import test.list_tests
 from test.support import bigaddrspacetest, MAX_Py_ssize_t
@@ -28,7 +26,7 @@ if sys.flags.bytes_warning:
     def check_bytes_warnings(func):
         @functools.wraps(func)
         def wrapper(*args, **kw):
-            with warnings_helper.check_warnings(('', BytesWarning)):
+            with test.support.check_warnings(('', BytesWarning)):
                 return func(*args, **kw)
         return wrapper
 else:
@@ -969,7 +967,7 @@ class BaseBytesTest:
         self.assertEqual(c, b'hllo')
 
     def test_sq_item(self):
-        _testcapi = import_helper.import_module('_testcapi')
+        _testcapi = test.support.import_module('_testcapi')
         obj = self.type2test((42,))
         with self.assertRaises(IndexError):
             _testcapi.sequence_getitem(obj, -2)
@@ -980,18 +978,6 @@ class BaseBytesTest:
 
 class BytesTest(BaseBytesTest, unittest.TestCase):
     type2test = bytes
-
-    def test__bytes__(self):
-        foo = b'foo\x00bar'
-        self.assertEqual(foo.__bytes__(), foo)
-        self.assertEqual(type(foo.__bytes__()), self.type2test)
-
-        class bytes_subclass(bytes):
-            pass
-
-        bar = bytes_subclass(b'bar\x00foo')
-        self.assertEqual(bar.__bytes__(), bar)
-        self.assertEqual(type(bar.__bytes__()), self.type2test)
 
     def test_getitem_error(self):
         b = b'python'
@@ -1038,8 +1024,8 @@ class BytesTest(BaseBytesTest, unittest.TestCase):
 
     # Test PyBytes_FromFormat()
     def test_from_format(self):
-        ctypes = import_helper.import_module('ctypes')
-        _testcapi = import_helper.import_module('_testcapi')
+        ctypes = test.support.import_module('ctypes')
+        _testcapi = test.support.import_module('_testcapi')
         from ctypes import pythonapi, py_object
         from ctypes import (
             c_int, c_uint,
@@ -1180,28 +1166,6 @@ class BytesTest(BaseBytesTest, unittest.TestCase):
         ba, bb = bytearray(b'ab'), BufferBlocked(b'ab')
         self.assertEqual(bytes(ba), b'ab')
         self.assertRaises(TypeError, bytes, bb)
-
-    def test_repeat_id_preserving(self):
-        a = b'123abc1@'
-        b = b'456zyx-+'
-        self.assertEqual(id(a), id(a))
-        self.assertNotEqual(id(a), id(b))
-        self.assertNotEqual(id(a), id(a * -4))
-        self.assertNotEqual(id(a), id(a * 0))
-        self.assertEqual(id(a), id(a * 1))
-        self.assertEqual(id(a), id(1 * a))
-        self.assertNotEqual(id(a), id(a * 2))
-
-        class SubBytes(bytes):
-            pass
-
-        s = SubBytes(b'qwerty()')
-        self.assertEqual(id(s), id(s))
-        self.assertNotEqual(id(s), id(s * -4))
-        self.assertNotEqual(id(s), id(s * 0))
-        self.assertNotEqual(id(s), id(s * 1))
-        self.assertNotEqual(id(s), id(1 * s))
-        self.assertNotEqual(id(s), id(s * 2))
 
 
 class ByteArrayTest(BaseBytesTest, unittest.TestCase):
@@ -1650,8 +1614,8 @@ class ByteArrayTest(BaseBytesTest, unittest.TestCase):
 
     @test.support.cpython_only
     def test_obsolete_write_lock(self):
-        _testcapi = import_helper.import_module('_testcapi')
-        self.assertRaises(BufferError, _testcapi.getbuffer_with_null_view, bytearray())
+        from _testcapi import getbuffer_with_null_view
+        self.assertRaises(BufferError, getbuffer_with_null_view, bytearray())
 
     def test_iterator_pickling2(self):
         orig = bytearray(b'abc')
@@ -1815,7 +1779,7 @@ class AssortedBytesTest(unittest.TestCase):
                          "BytesWarning is needed for this test: use -bb option")
     def test_compare(self):
         def bytes_warning():
-            return warnings_helper.check_warnings(('', BytesWarning))
+            return test.support.check_warnings(('', BytesWarning))
         with bytes_warning():
             b'' == ''
         with bytes_warning():
@@ -1940,30 +1904,28 @@ class SubclassTest:
     def test_pickle(self):
         a = self.type2test(b"abcd")
         a.x = 10
-        a.z = self.type2test(b"efgh")
+        a.y = self.type2test(b"efgh")
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             b = pickle.loads(pickle.dumps(a, proto))
             self.assertNotEqual(id(a), id(b))
             self.assertEqual(a, b)
             self.assertEqual(a.x, b.x)
-            self.assertEqual(a.z, b.z)
+            self.assertEqual(a.y, b.y)
             self.assertEqual(type(a), type(b))
-            self.assertEqual(type(a.z), type(b.z))
-            self.assertFalse(hasattr(b, 'y'))
+            self.assertEqual(type(a.y), type(b.y))
 
     def test_copy(self):
         a = self.type2test(b"abcd")
         a.x = 10
-        a.z = self.type2test(b"efgh")
+        a.y = self.type2test(b"efgh")
         for copy_method in (copy.copy, copy.deepcopy):
             b = copy_method(a)
             self.assertNotEqual(id(a), id(b))
             self.assertEqual(a, b)
             self.assertEqual(a.x, b.x)
-            self.assertEqual(a.z, b.z)
+            self.assertEqual(a.y, b.y)
             self.assertEqual(type(a), type(b))
-            self.assertEqual(type(a.z), type(b.z))
-            self.assertFalse(hasattr(b, 'y'))
+            self.assertEqual(type(a.y), type(b.y))
 
     def test_fromhex(self):
         b = self.type2test.fromhex('1a2B30')
@@ -1996,9 +1958,6 @@ class SubclassTest:
 class ByteArraySubclass(bytearray):
     pass
 
-class ByteArraySubclassWithSlots(bytearray):
-    __slots__ = ('x', 'y', '__dict__')
-
 class BytesSubclass(bytes):
     pass
 
@@ -2019,9 +1978,6 @@ class ByteArraySubclassTest(SubclassTest, unittest.TestCase):
         x = subclass(newarg=4, source=b"abcd")
         self.assertEqual(x, b"abcd")
 
-class ByteArraySubclassWithSlotsTest(SubclassTest, unittest.TestCase):
-    basetype = bytearray
-    type2test = ByteArraySubclassWithSlots
 
 class BytesSubclassTest(SubclassTest, unittest.TestCase):
     basetype = bytes

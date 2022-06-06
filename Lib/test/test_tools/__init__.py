@@ -4,17 +4,12 @@ import importlib
 import os.path
 import unittest
 from test import support
-from test.support import import_helper
 
 
 if support.check_sanitizer(address=True, memory=True):
     # bpo-46633: Skip the test because it is too slow when Python is built
     # with ASAN/MSAN: between 5 and 20 minutes on GitHub Actions.
     raise unittest.SkipTest("test too slow on ASAN/MSAN build")
-
-
-if not support.has_subprocess_support:
-    raise unittest.SkipTest("test module requires subprocess")
 
 
 basepath = os.path.normpath(
@@ -38,11 +33,11 @@ def skip_if_missing(tool=None):
 @contextlib.contextmanager
 def imports_under_tool(name, *subdirs):
     tooldir = os.path.join(toolsdir, name, *subdirs)
-    with import_helper.DirsOnSysPath(tooldir) as cm:
+    with support.DirsOnSysPath(tooldir) as cm:
         yield cm
 
 def import_tool(toolname):
-    with import_helper.DirsOnSysPath(scriptsdir):
+    with support.DirsOnSysPath(scriptsdir):
         return importlib.import_module(toolname)
 
 def load_tests(*args):

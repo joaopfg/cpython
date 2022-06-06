@@ -22,15 +22,11 @@ except ImportError:
     _testbuffer = None
 
 from test import support
-from test.support import os_helper
 from test.support import (
-    TestFailed, run_with_locale, no_tracing,
-    _2G, _4G, bigmemtest
+    TestFailed, TESTFN, run_with_locale, no_tracing,
+    _2G, _4G, bigmemtest, reap_threads, forget,
+    save_restore_warnings_filters
     )
-from test.support.import_helper import forget
-from test.support.os_helper import TESTFN
-from test.support import threading_helper
-from test.support.warnings_helper import save_restore_warnings_filters
 
 from pickle import bytes_types
 
@@ -1379,8 +1375,7 @@ class AbstractUnpickleTests:
         for p in badpickles:
             self.check_unpickling_error(self.truncated_errors, p)
 
-    @threading_helper.reap_threads
-    @threading_helper.requires_working_threading()
+    @reap_threads
     def test_unpickle_module_race(self):
         # https://bugs.python.org/issue34572
         locker_module = dedent("""
@@ -1853,14 +1848,6 @@ class AbstractPickleTests:
                 elif proto == 5:
                     self.assertNotIn(b'bytearray', p)
                     self.assertTrue(opcode_in_pickle(pickle.BYTEARRAY8, p))
-
-    def test_bytearray_memoization_bug(self):
-        for proto in protocols:
-            for s in b'', b'xyz', b'xyz'*100:
-                b = bytearray(s)
-                p = self.dumps((b, b), proto)
-                b1, b2 = self.loads(p)
-                self.assertIs(b1, b2)
 
     def test_ints(self):
         for proto in protocols:
@@ -2383,11 +2370,9 @@ class AbstractPickleTests:
     def test_bad_getattr(self):
         # Issue #3514: crash when there is an infinite loop in __getattr__
         x = BadGetattr()
-        for proto in range(2):
+        for proto in protocols:
             with support.infinite_recursion():
                 self.assertRaises(RuntimeError, self.dumps, x, proto)
-        for proto in range(2, pickle.HIGHEST_PROTOCOL + 1):
-            s = self.dumps(x, proto)
 
     def test_reduce_bad_iterator(self):
         # Issue4176: crash when 4th and 5th items of __reduce__()
@@ -3317,7 +3302,7 @@ class AbstractPickleModuleTests:
             f.close()
             self.assertRaises(ValueError, self.dump, 123, f)
         finally:
-            os_helper.unlink(TESTFN)
+            support.unlink(TESTFN)
 
     def test_load_closed_file(self):
         f = open(TESTFN, "wb")
@@ -3325,7 +3310,7 @@ class AbstractPickleModuleTests:
             f.close()
             self.assertRaises(ValueError, self.dump, 123, f)
         finally:
-            os_helper.unlink(TESTFN)
+            support.unlink(TESTFN)
 
     def test_load_from_and_dump_to_file(self):
         stream = io.BytesIO()
@@ -3356,7 +3341,7 @@ class AbstractPickleModuleTests:
                 self.assertRaises(TypeError, self.dump, 123, f, proto)
         finally:
             f.close()
-            os_helper.unlink(TESTFN)
+            support.unlink(TESTFN)
 
     def test_incomplete_input(self):
         s = io.BytesIO(b"X''.")

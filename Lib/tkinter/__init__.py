@@ -30,7 +30,6 @@ button.pack(side=BOTTOM)
 tk.mainloop()
 """
 
-import collections
 import enum
 import sys
 import types
@@ -144,31 +143,8 @@ def _splitdict(tk, v, cut_minus=True, conv=None):
         dict[key] = value
     return dict
 
-class _VersionInfoType(collections.namedtuple('_VersionInfoType',
-        ('major', 'minor', 'micro', 'releaselevel', 'serial'))):
-    def __str__(self):
-        if self.releaselevel == 'final':
-            return f'{self.major}.{self.minor}.{self.micro}'
-        else:
-            return f'{self.major}.{self.minor}{self.releaselevel[0]}{self.serial}'
 
-def _parse_version(version):
-    import re
-    m = re.fullmatch(r'(\d+)\.(\d+)([ab.])(\d+)', version)
-    major, minor, releaselevel, serial = m.groups()
-    major, minor, serial = int(major), int(minor), int(serial)
-    if releaselevel == '.':
-        micro = serial
-        serial = 0
-        releaselevel = 'final'
-    else:
-        micro = 0
-        releaselevel = {'a': 'alpha', 'b': 'beta'}[releaselevel]
-    return _VersionInfoType(major, minor, micro, releaselevel, serial)
-
-
-@enum._simple_enum(enum.StrEnum)
-class EventType:
+class EventType(str, enum.Enum):
     KeyPress = '2'
     Key = KeyPress
     KeyRelease = '3'
@@ -208,6 +184,8 @@ class EventType:
     Activate = '36'
     Deactivate = '37'
     MouseWheel = '38'
+
+    __str__ = str.__str__
 
 
 class Event:
@@ -314,37 +292,12 @@ def _get_default_root(what=None):
     if not _support_default_root:
         raise RuntimeError("No master specified and tkinter is "
                            "configured to not support default root")
-    if _default_root is None:
+    if not _default_root:
         if what:
             raise RuntimeError(f"Too early to {what}: no default root window")
         root = Tk()
         assert _default_root is root
     return _default_root
-
-
-def _get_temp_root():
-    global _support_default_root
-    if not _support_default_root:
-        raise RuntimeError("No master specified and tkinter is "
-                           "configured to not support default root")
-    root = _default_root
-    if root is None:
-        assert _support_default_root
-        _support_default_root = False
-        root = Tk()
-        _support_default_root = True
-        assert _default_root is None
-        root.withdraw()
-        root._temporary = True
-    return root
-
-
-def _destroy_temp_root(master):
-    if getattr(master, '_temporary', False):
-        try:
-            master.destroy()
-        except TclError:
-            pass
 
 
 def _tkerror(err):
@@ -389,7 +342,7 @@ class Variable:
         if name is not None and not isinstance(name, str):
             raise TypeError("name must be a string")
         global _varnum
-        if master is None:
+        if not master:
             master = _get_default_root('create variable')
         self._root = master._root()
         self._tk = master.tk
@@ -851,7 +804,7 @@ class Misc:
         function which shall be called. Additional parameters
         are given as parameters to the function call.  Return
         identifier to cancel scheduling with after_cancel."""
-        if func is None:
+        if not func:
             # I'd rather use time.sleep(ms*0.001)
             self.tk.call('after', ms)
             return None
@@ -864,11 +817,7 @@ class Misc:
                         self.deletecommand(name)
                     except TclError:
                         pass
-            try:
-                callit.__name__ = func.__name__
-            except AttributeError:
-                # Required for callable classes (bpo-44404)
-                callit.__name__ = type(func).__name__
+            callit.__name__ = func.__name__
             name = self._register(callit)
             return self.tk.call('after', ms, name)
 
@@ -1077,11 +1026,6 @@ class Misc:
         self.tk.call('raise', self._w, aboveThis)
 
     lift = tkraise
-
-    def info_patchlevel(self):
-        """Returns the exact version of the Tcl library."""
-        patchlevel = self.tk.call('info', 'patchlevel')
-        return _parse_version(patchlevel)
 
     def winfo_atom(self, name, displayof=0):
         """Return integer which represents atom NAME."""
@@ -1593,7 +1537,7 @@ class Misc:
     def _root(self):
         """Internal function."""
         w = self
-        while w.master is not None: w = w.master
+        while w.master: w = w.master
         return w
     _subst_format = ('%#', '%b', '%f', '%h', '%k',
              '%s', '%t', '%w', '%x', '%y',
@@ -2357,7 +2301,7 @@ class Tk(Misc, Wm):
         self.tk.createcommand('exit', _exit)
         self._tclCommands.append('tkerror')
         self._tclCommands.append('exit')
-        if _support_default_root and _default_root is None:
+        if _support_default_root and not _default_root:
             _default_root = self
         self.protocol("WM_DELETE_WINDOW", self.destroy)
 
@@ -2585,7 +2529,7 @@ class BaseWidget(Misc):
 
     def _setup(self, master, cnf):
         """Internal function. Sets up information about children."""
-        if master is None:
+        if not master:
             master = _get_default_root()
         self.master = master
         self.tk = master.tk
@@ -4000,7 +3944,7 @@ class _setit:
 
     def __call__(self, *args):
         self.__var.set(self.__value)
-        if self.__callback is not None:
+        if self.__callback:
             self.__callback(self.__value, *args)
 
 
@@ -4049,7 +3993,7 @@ class Image:
 
     def __init__(self, imgtype, name=None, cnf={}, master=None, **kw):
         self.name = None
-        if master is None:
+        if not master:
             master = _get_default_root('create image')
         self.tk = getattr(master, 'tk', master)
         if not name:

@@ -6,7 +6,6 @@ import os.path
 import tempfile
 import tokenize
 from test import support
-from test.support import os_helper
 
 
 FILENAME = linecache.__file__
@@ -45,7 +44,7 @@ class TempFile:
         with tempfile.NamedTemporaryFile(delete=False) as fp:
             self.file_name = fp.name
             fp.write(self.file_byte_string)
-        self.addCleanup(os_helper.unlink, self.file_name)
+        self.addCleanup(support.unlink, self.file_name)
 
 
 class GetLineTestsGoodData(TempFile):
@@ -116,7 +115,7 @@ class LineCacheTests(unittest.TestCase):
         # Check module loading
         for entry in MODULES:
             filename = os.path.join(MODULE_PATH, entry) + '.py'
-            with open(filename, encoding='utf-8') as file:
+            with open(filename) as file:
                 for index, line in enumerate(file):
                     self.assertEqual(line, getline(filename, index + 1))
 
@@ -125,10 +124,10 @@ class LineCacheTests(unittest.TestCase):
         self.assertEqual(empty, [])
 
     def test_no_ending_newline(self):
-        self.addCleanup(os_helper.unlink, os_helper.TESTFN)
-        with open(os_helper.TESTFN, "w", encoding='utf-8') as fp:
+        self.addCleanup(support.unlink, support.TESTFN)
+        with open(support.TESTFN, "w") as fp:
             fp.write(SOURCE_3)
-        lines = linecache.getlines(os_helper.TESTFN)
+        lines = linecache.getlines(support.TESTFN)
         self.assertEqual(lines, ["\n", "def f():\n", "    return 3\n"])
 
     def test_clearcache(self):
@@ -151,20 +150,20 @@ class LineCacheTests(unittest.TestCase):
     def test_checkcache(self):
         getline = linecache.getline
         # Create a source file and cache its contents
-        source_name = os_helper.TESTFN + '.py'
-        self.addCleanup(os_helper.unlink, source_name)
-        with open(source_name, 'w', encoding='utf-8') as source:
+        source_name = support.TESTFN + '.py'
+        self.addCleanup(support.unlink, source_name)
+        with open(source_name, 'w') as source:
             source.write(SOURCE_1)
         getline(source_name, 1)
 
         # Keep a copy of the old contents
         source_list = []
-        with open(source_name, encoding='utf-8') as source:
+        with open(source_name) as source:
             for index, line in enumerate(source):
                 self.assertEqual(line, getline(source_name, index + 1))
                 source_list.append(line)
 
-        with open(source_name, 'w', encoding='utf-8') as source:
+        with open(source_name, 'w') as source:
             source.write(SOURCE_2)
 
         # Try to update a bogus cache entry
@@ -176,7 +175,7 @@ class LineCacheTests(unittest.TestCase):
 
         # Update the cache and check whether it matches the new source file
         linecache.checkcache(source_name)
-        with open(source_name, encoding='utf-8') as source:
+        with open(source_name) as source:
             for index, line in enumerate(source):
                 self.assertEqual(line, getline(source_name, index + 1))
                 source_list.append(line)
@@ -243,14 +242,14 @@ class LineCacheInvalidationTests(unittest.TestCase):
     def setUp(self):
         super().setUp()
         linecache.clearcache()
-        self.deleted_file = os_helper.TESTFN + '.1'
-        self.modified_file = os_helper.TESTFN + '.2'
-        self.unchanged_file = os_helper.TESTFN + '.3'
+        self.deleted_file = support.TESTFN + '.1'
+        self.modified_file = support.TESTFN + '.2'
+        self.unchanged_file = support.TESTFN + '.3'
 
         for fname in (self.deleted_file,
                       self.modified_file,
                       self.unchanged_file):
-            self.addCleanup(os_helper.unlink, fname)
+            self.addCleanup(support.unlink, fname)
             with open(fname, 'w', encoding='utf-8') as source:
                 source.write(f'print("I am {fname}")')
 

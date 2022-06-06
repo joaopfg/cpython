@@ -1,14 +1,7 @@
 import unittest
 from test import support
-from test.support import warnings_helper
 import os
 import sys
-import types
-
-try:
-    import _multiprocessing
-except ModuleNotFoundError:
-    _multiprocessing = None
 
 
 if support.check_sanitizer(address=True, memory=True):
@@ -27,21 +20,9 @@ class FailedImport(RuntimeError):
 
 class AllTest(unittest.TestCase):
 
-    def setUp(self):
-        # concurrent.futures uses a __getattr__ hook. Its __all__ triggers
-        # import of a submodule, which fails when _multiprocessing is not
-        # available.
-        if _multiprocessing is None:
-            sys.modules["_multiprocessing"] = types.ModuleType("_multiprocessing")
-
-    def tearDown(self):
-        if _multiprocessing is None:
-            sys.modules.pop("_multiprocessing")
-
     def check_all(self, modname):
         names = {}
-        with warnings_helper.check_warnings(
-            (f".*{modname}", DeprecationWarning),
+        with support.check_warnings(
             (".* (module|package)", DeprecationWarning),
             (".* (module|package)", PendingDeprecationWarning),
             ("", ResourceWarning),
@@ -57,7 +38,7 @@ class AllTest(unittest.TestCase):
             raise NoAll(modname)
         names = {}
         with self.subTest(module=modname):
-            with warnings_helper.check_warnings(
+            with support.check_warnings(
                 ("", DeprecationWarning),
                 ("", ResourceWarning),
                 quiet=True):
@@ -94,8 +75,8 @@ class AllTest(unittest.TestCase):
             yield path, modpath + fn[:-3]
 
     def test_all(self):
-        # List of denied modules and packages
-        denylist = set([
+        # Blacklisted modules and packages
+        blacklist = set([
             # Will raise a SyntaxError when compiling the exec statement
             '__future__',
         ])
@@ -110,13 +91,13 @@ class AllTest(unittest.TestCase):
         lib_dir = os.path.dirname(os.path.dirname(__file__))
         for path, modname in self.walk_modules(lib_dir, ""):
             m = modname
-            denied = False
+            blacklisted = False
             while m:
-                if m in denylist:
-                    denied = True
+                if m in blacklist:
+                    blacklisted = True
                     break
                 m = m.rpartition('.')[0]
-            if denied:
+            if blacklisted:
                 continue
             if support.verbose:
                 print(modname)

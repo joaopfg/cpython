@@ -2,7 +2,6 @@ import copy
 import gc
 import pickle
 import sys
-import doctest
 import unittest
 import weakref
 import inspect
@@ -161,14 +160,6 @@ class GeneratorTest(unittest.TestCase):
         for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             with self.assertRaises((TypeError, pickle.PicklingError)):
                 pickle.dumps(g, proto)
-
-    def test_send_non_none_to_new_gen(self):
-        def f():
-            yield 1
-        g = f()
-        with self.assertRaises(TypeError):
-            g.send(0)
-        self.assertEqual(next(g), 1)
 
 
 class ExceptionTest(unittest.TestCase):
@@ -897,7 +888,7 @@ From the Iterators list, about the types of these things.
 >>> type(i)
 <class 'generator'>
 >>> [s for s in dir(i) if not s.startswith('_')]
-['close', 'gi_code', 'gi_frame', 'gi_running', 'gi_suspended', 'gi_yieldfrom', 'send', 'throw']
+['close', 'gi_code', 'gi_frame', 'gi_running', 'gi_yieldfrom', 'send', 'throw']
 >>> from test.support import HAVE_DOCSTRINGS
 >>> print(i.__next__.__doc__ if HAVE_DOCSTRINGS else 'Implement next(self).')
 Implement next(self).
@@ -916,7 +907,7 @@ And more, added later.
 >>> i.gi_running = 42
 Traceback (most recent call last):
   ...
-AttributeError: attribute 'gi_running' of 'generator' objects is not writable
+AttributeError: readonly attribute
 >>> def g():
 ...     yield me.gi_running
 >>> me = g()
@@ -2050,7 +2041,7 @@ SyntaxError: 'yield' outside function
 >>> def f(): (yield bar) = y
 Traceback (most recent call last):
   ...
-SyntaxError: cannot assign to yield expression here. Maybe you meant '==' instead of '='?
+SyntaxError: cannot assign to yield expression
 
 >>> def f(): (yield bar) += y
 Traceback (most recent call last):
@@ -2380,10 +2371,15 @@ __test__ = {"tut":      tutorial_tests,
             "refleaks": refleaks_tests,
             }
 
-def load_tests(loader, tests, pattern):
-    tests.addTest(doctest.DocTestSuite())
-    return tests
+# Magic test name that regrtest.py invokes *after* importing this module.
+# This worms around a bootstrap problem.
+# Note that doctest and regrtest both look in sys.argv for a "-v" argument,
+# so this works as expected in both ways of running regrtest.
+def test_main(verbose=None):
+    from test import support, test_generators
+    support.run_unittest(__name__)
+    support.run_doctest(test_generators, verbose)
 
-
+# This part isn't needed for regrtest, but for running the test directly.
 if __name__ == "__main__":
-    unittest.main()
+    test_main(1)

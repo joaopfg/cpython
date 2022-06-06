@@ -62,9 +62,6 @@ class TestPgen2Caching(support.TestCase):
             shutil.rmtree(tmpdir)
 
     @unittest.skipIf(sys.executable is None, 'sys.executable required')
-    @unittest.skipIf(
-        sys.platform == 'emscripten', 'requires working subprocess'
-    )
     def test_load_grammar_from_subprocess(self):
         tmpdir = tempfile.mkdtemp()
         tmpsubdir = os.path.join(tmpdir, 'subdir')
@@ -88,14 +85,12 @@ class TestPgen2Caching(support.TestCase):
             # different hash randomization seed.
             sub_env = dict(os.environ)
             sub_env['PYTHONHASHSEED'] = 'random'
-            code = """
+            subprocess.check_call(
+                    [sys.executable, '-c', """
 from lib2to3.pgen2 import driver as pgen2_driver
 pgen2_driver.load_grammar(%r, save=True, force=True)
-            """ % (grammar_sub_copy,)
-            cmd = [sys.executable,
-                   '-Wignore:lib2to3:DeprecationWarning',
-                   '-c', code]
-            subprocess.check_call( cmd, env=sub_env)
+                    """ % (grammar_sub_copy,)],
+                    env=sub_env)
             self.assertTrue(os.path.exists(pickle_sub_name))
 
             with open(pickle_name, 'rb') as pickle_f_1, \

@@ -3,8 +3,6 @@ Test script for doctest.
 """
 
 from test import support
-from test.support import import_helper
-from test.support import os_helper
 import doctest
 import functools
 import os
@@ -15,17 +13,10 @@ import importlib.util
 import unittest
 import tempfile
 import shutil
-import types
 import contextlib
-
-
-if not support.has_subprocess_support:
-    raise unittest.SkipTest("test_CLI requires subprocess support.")
-
 
 # NOTE: There are some additional tests relating to interaction with
 #       zipimport in the test_zipimport_support test module.
-# There are also related tests in `test_doctest2` module.
 
 ######################################################################
 ## Sample Objects (used by test cases)
@@ -461,7 +452,7 @@ We'll simulate a __file__ attr that ends in pyc:
     >>> tests = finder.find(sample_func)
 
     >>> print(tests)  # doctest: +ELLIPSIS
-    [<DocTest sample_func from test_doctest.py:34 (1 example)>]
+    [<DocTest sample_func from ...:25 (1 example)>]
 
 The exact name depends on how test_doctest was invoked, so allow for
 leading path components.
@@ -643,26 +634,6 @@ displays.
      1  SampleClass.double
      1  SampleClass.get
 
-When used with `exclude_empty=False` we are also interested in line numbers
-of doctests that are empty.
-It used to be broken for quite some time until `bpo-28249`.
-
-    >>> from test import doctest_lineno
-    >>> tests = doctest.DocTestFinder(exclude_empty=False).find(doctest_lineno)
-    >>> for t in tests:
-    ...     print('%5s  %s' % (t.lineno, t.name))
-     None  test.doctest_lineno
-       22  test.doctest_lineno.ClassWithDocstring
-       30  test.doctest_lineno.ClassWithDoctest
-     None  test.doctest_lineno.ClassWithoutDocstring
-     None  test.doctest_lineno.MethodWrapper
-       39  test.doctest_lineno.MethodWrapper.method_with_docstring
-       45  test.doctest_lineno.MethodWrapper.method_with_doctest
-     None  test.doctest_lineno.MethodWrapper.method_without_docstring
-        4  test.doctest_lineno.func_with_docstring
-       12  test.doctest_lineno.func_with_doctest
-     None  test.doctest_lineno.func_without_docstring
-
 Turning off Recursion
 ~~~~~~~~~~~~~~~~~~~~~
 DocTestFinder can be told not to look for tests in contained objects
@@ -709,11 +680,11 @@ plain ol' Python and is guaranteed to be available.
 
     >>> import builtins
     >>> tests = doctest.DocTestFinder().find(builtins)
-    >>> 825 < len(tests) < 845 # approximate number of objects with docstrings
+    >>> 816 < len(tests) < 836 # approximate number of objects with docstrings
     True
     >>> real_tests = [t for t in tests if len(t.examples) > 0]
     >>> len(real_tests) # objects that actually have doctests
-    14
+    13
     >>> for t in real_tests:
     ...     print('{}  {}'.format(len(t.examples), t.name))
     ...
@@ -726,7 +697,6 @@ plain ol' Python and is guaranteed to be available.
     1  builtins.hex
     1  builtins.int
     3  builtins.int.as_integer_ratio
-    2  builtins.int.bit_count
     2  builtins.int.bit_length
     5  builtins.memoryview.hex
     1  builtins.oct
@@ -740,18 +710,6 @@ and 'int' is a type.
 
 class TestDocTestFinder(unittest.TestCase):
 
-    def test_issue35753(self):
-        # This import of `call` should trigger issue35753 when
-        # `support.run_doctest` is called due to unwrap failing,
-        # however with a patched doctest this should succeed.
-        from unittest.mock import call
-        dummy_module = types.ModuleType("dummy")
-        dummy_module.__dict__['inject_call'] = call
-        try:
-            support.run_doctest(dummy_module, verbosity=True)
-        except ValueError as e:
-            raise support.TestFailed("Doctest unwrap failed") from e
-
     def test_empty_namespace_package(self):
         pkg_name = 'doctest_empty_pkg'
         with tempfile.TemporaryDirectory() as parent_dir:
@@ -761,7 +719,7 @@ class TestDocTestFinder(unittest.TestCase):
             try:
                 mod = importlib.import_module(pkg_name)
             finally:
-                import_helper.forget(pkg_name)
+                support.forget(pkg_name)
                 sys.path.pop()
 
             include_empty_finder = doctest.DocTestFinder(exclude_empty=False)
@@ -2814,7 +2772,7 @@ whitespace if doctest does not correctly do the newline conversion.
     >>> dn = tempfile.mkdtemp()
     >>> pkg = os.path.join(dn, "doctest_testpkg")
     >>> os.mkdir(pkg)
-    >>> os_helper.create_empty_file(os.path.join(pkg, "__init__.py"))
+    >>> support.create_empty_file(os.path.join(pkg, "__init__.py"))
     >>> fn = os.path.join(pkg, "doctest_testfile.txt")
     >>> with open(fn, 'wb') as f:
     ...     f.write(
@@ -2849,12 +2807,10 @@ out of the binary module.
 
 try:
     os.fsencode("foo-bär@baz.py")
-    supports_unicode = True
 except UnicodeEncodeError:
     # Skip the test: the filesystem encoding is unable to encode the filename
-    supports_unicode = False
-
-if supports_unicode and not support.has_no_debug_ranges():
+    pass
+else:
     def test_unicode(): """
 Check doctest with a non-ascii filename:
 
@@ -2876,10 +2832,8 @@ Check doctest with a non-ascii filename:
         Traceback (most recent call last):
           File ...
             exec(compile(example.source, filename, "single",
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           File "<doctest foo-bär@baz[0]>", line 1, in <module>
             raise Exception('clé')
-            ^^^^^^^^^^^^^^^^^^^^^^
         Exception: clé
     TestResults(failed=1, attempted=1)
     """
@@ -2900,11 +2854,10 @@ With those preliminaries out of the way, we'll start with a file with two
 simple tests and no errors.  We'll run both the unadorned doctest command, and
 the verbose version, and then check the output:
 
-    >>> from test.support import script_helper
-    >>> from test.support.os_helper import temp_dir
+    >>> from test.support import script_helper, temp_dir
     >>> with temp_dir() as tmpdir:
     ...     fn = os.path.join(tmpdir, 'myfile.doc')
-    ...     with open(fn, 'w', encoding='utf-8') as f:
+    ...     with open(fn, 'w') as f:
     ...         _ = f.write('This is a very simple test file.\n')
     ...         _ = f.write('   >>> 1 + 1\n')
     ...         _ = f.write('   2\n')
@@ -2952,11 +2905,10 @@ ability to process more than one file on the command line and, since the second
 file ends in '.py', its handling of python module files (as opposed to straight
 text files).
 
-    >>> from test.support import script_helper
-    >>> from test.support.os_helper import temp_dir
+    >>> from test.support import script_helper, temp_dir
     >>> with temp_dir() as tmpdir:
     ...     fn = os.path.join(tmpdir, 'myfile.doc')
-    ...     with open(fn, 'w', encoding="utf-8") as f:
+    ...     with open(fn, 'w') as f:
     ...         _ = f.write('This is another simple test file.\n')
     ...         _ = f.write('   >>> 1 + 1\n')
     ...         _ = f.write('   2\n')
@@ -2967,7 +2919,7 @@ text files).
     ...         _ = f.write('\n')
     ...         _ = f.write('And that is it.\n')
     ...     fn2 = os.path.join(tmpdir, 'myfile2.py')
-    ...     with open(fn2, 'w', encoding='utf-8') as f:
+    ...     with open(fn2, 'w') as f:
     ...         _ = f.write('def test_func():\n')
     ...         _ = f.write('   \"\"\"\n')
     ...         _ = f.write('   This is simple python test function.\n')
@@ -3097,11 +3049,10 @@ Invalid file name:
     ...         '-m', 'doctest', 'nosuchfile')
     >>> rc, out
     (1, b'')
-    >>> # The exact error message changes depending on the platform.
     >>> print(normalize(err))                    # doctest: +ELLIPSIS
     Traceback (most recent call last):
       ...
-    FileNotFoundError: [Errno ...] ...nosuchfile...
+    FileNotFoundError: [Errno ...] No such file or directory: 'nosuchfile'
 
 Invalid doctest option:
 
@@ -3179,7 +3130,7 @@ def load_tests(loader, tests, pattern):
 
 
 def test_coverage(coverdir):
-    trace = import_helper.import_module('trace')
+    trace = support.import_module('trace')
     tracer = trace.Trace(ignoredirs=[sys.base_prefix, sys.base_exec_prefix,],
                          trace=0, count=1)
     tracer.run('test_main()')
